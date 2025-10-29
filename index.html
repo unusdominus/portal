@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 1. Título do Portal Atualizado -->
+    <title>Unus Dominus - Portal Católico de Goiânia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lora:wght@700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Lora', serif; }
+        .card { transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        /* Estilo de Carregamento (Loading) */
+        .loader { border-top-color: #8B4513; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="app" class="max-w-7xl mx-auto">
+        <!-- Tela de Carregamento Inicial -->
+        <div id="loading-screen" class="flex items-center justify-center h-screen">
+            <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div>
+        </div>
+    </div>
+
+    <!-- 2. Scripts do Firebase - ESSENCIAL -->
+    <!-- (Usando a versão 'compat' para ser mais fácil de integrar com o código JS simples) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+    <script>
+        // --- 3. CONFIGURAÇÃO DO FIREBASE ---
+        // ATENÇÃO: Substitua este objeto pelas credenciais do SEU projeto
+        // Você encontra isso no Console do Firebase > Configurações do Projeto
+        const firebaseConfig = {
+            apiKey: "SEU_API_KEY",
+            authDomain: "SEU_AUTH_DOMAIN",
+            projectId: "SEU_PROJECT_ID",
+            storageBucket: "SEU_STORAGE_BUCKET",
+            messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
+
+        // Inicializa o Firebase
+        firebase.initializeApp(firebaseConfig);
+        
+        // Inicializa os serviços que usaremos
+        const db = firebase.firestore();       // Nosso banco de dados (Firestore)
+        const auth = firebase.auth();         // Nosso porteiro (Authentication)
+        const storage = firebase.storage();   // Nosso armazém (Storage)
+
+
+        // --- 4. BANCO DE DADOS LOCAL (CACHE) ---
+        // Estes dados agora virão do Firestore
+        let igrejasDB = [];
+        let globalInfoDB = {};
+
+        // --- GERENCIADOR DE ESTADO DA APLICAÇÃO ---
+        const state = {
+            currentPage: 'home', // 'home', 'details', 'adminLogin', 'adminPanel'
+            selectedChurchId: null,
+            adminChurchId: null, // Armazena o ID do documento da paróquia que o admin gerencia
+            searchTerm: '',
+            currentUser: null // Armazena o usuário logado
+        };
+
+        const appContainer = document.getElementById('app');
+
+        // --- 5. FUNÇÕES DE BUSCA DE DADOS (AGORA COM FIREBASE) ---
+
+        async function loadInitialData() {
+            try {
+                // 1. Buscar o conteúdo global (Liturgia, Santo do Dia...)
+                //    Busca da coleção 'globalContent', documento 'main'
+                const globalDoc = await db.collection('globalContent').doc('main').get();
+                if (globalDoc.exists) {
+                    globalInfoDB = globalDoc.data();
+                } else {
+                    console.error("Erro: Documento 'globalContent/main' não encontrado!");
+                    // Usar dados de fallback para a UI não quebrar
+                    globalInfoDB = { destaquePrincipal: {}, liturgiaDiaria: { primeiraLeitura: {}, salmo: {}, evangelho: {} }, santoDoDia: {}, festividadesSemana: [], anuncios: [] };
+                }
+
+                // 2. Buscar todas as paróquias
+                //    Busca todos os documentos da coleção 'parishes'
+                const parishesSnapshot = await db.collection('parishes').get();
+                igrejasDB = parishesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                // 3. Renderizar a página inicial com os dados carregados
+                renderHomePage();
+
+            } catch (error) {
+                console.error("Erro ao carregar dados do Firestore:", error);
+                appContainer.innerHTML = `<div class="text-center p-10"><h2 class="text-2xl text-red-600">Erro ao conectar ao banco de dados.</h2><p>${error.message}</p></div>`;
+            }
+        }
+
+
+        // --- 6. FUNÇÕES DE RENDERIZAÇÃO (UI) ---
+
+        function renderHeader(title, subtitle, showAdminLink = true) {
+            // Mostra o botão de "Sair" se o usuário estiver logado
+            const adminButton = state.currentUser ? 
+                `<button onclick="handleAdminLogout()" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors">
+                    <i class="fa-solid fa-sign-out-alt mr-2"></i>Sair
+                </button>` :
+                `<button onclick="navigateTo('adminLogin')" class="bg-amber-800 text-white font-bold py-2 px-4 rounded-lg hover:bg-amber-900 transition-colors">
+                    <i class="fa-solid fa-user-shield mr-2"></i>Acesso da Paróquia
+                </button>`;
+
+            return `
+                <header class="bg-white shadow-md p-6 flex justify-between items-center rounded-b-lg mb-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">${title}</h1>
+                        <p class="text-gray-600">${subtitle}</p>
+                    </div>
+                    ${showAdminLink ? adminButton : ''}
+                </header>
+            `;
+        }
+        
+        function renderHomePage() {
+            const filteredIgrejas = igrejasDB.filter(igreja =>
+                igreja.nome.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+                (igreja.endereco && igreja.endereco.toLowerCase().includes(state.searchTerm.toLowerCase()))
+            );
+
+            let churchesHTML = filteredIgrejas.map(igreja => `
+                <div class="card bg-white rounded-lg overflow-hidden shadow-lg cursor-pointer" onclick="navigateTo('details', '${igreja.id}')">
+                    <img class="w-full h-40 object-cover" src="${igreja.fotoUrl || 'https://placehold.co/600x400/c2b280/FFFFFF?text=Sem+Foto'}" alt="Foto da ${igreja.nome}">
+                    <div class="p-4">
+                        <h3 class="text-lg font-bold text-gray-800">${igreja.nome}</h3>
+                        <p class="text-sm text-gray-600 mt-1 line-clamp-2"><i class="fa-solid fa-location-dot mr-2"></i>${igreja.endereco || 'Endereço não informado'}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            appContainer.innerHTML = `
+                ${renderHeader('Unus Dominus', 'Portal Católico de Goiânia')}
+                <main class="px-6 pb-10">
+                    <!-- Destaque Principal -->
+                    <div class="mb-8 bg-white rounded-lg shadow-lg overflow-hidden">
+                        <img src="${globalInfoDB.destaquePrincipal.imagemUrl || 'https://placehold.co/1200x400/8B4513/FFFFFF?text=Unus+Dominus'}" alt="${globalInfoDB.destaquePrincipal.titulo}" class="w-full h-48 object-cover">
+                        <div class="p-6">
+                            <h2 class="text-3xl font-bold text-amber-800">${globalInfoDB.destaquePrincipal.titulo || 'Bem-vindo ao Portal Unus Dominus'}</h2>
+                            <p class="text-gray-700 mt-2">${globalInfoDB.destaquePrincipal.descricao || 'Informações da Arquidiocese de Goiânia.'}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col lg:flex-row gap-8">
+                        <!-- Coluna Principal: Paróquias -->
+                        <div class="w-full lg:w-2/3">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">Encontre sua Paróquia</h2>
+                            <div class="mb-6">
+                                <input type="text" id="search-input" value="${state.searchTerm}" onkeyup="handleSearch(this.value)" placeholder="Buscar por nome ou endereço..." class="w-full p-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-800">
+                            </div>
+                            <div class="grid md:grid-cols-2 gap-6">
+                                ${churchesHTML || '<p class="text-center col-span-full">Nenhuma igreja encontrada.</p>'}
+                            </div>
+                        </div>
+                        
+                        <!-- Coluna Lateral: Mural Diocesano -->
+                        <aside class="w-full lg:w-1/3">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">Mural Diocesano</h2>
+                            <div class="space-y-6">
+                                ${renderMuralDiocesano()}
+                            </div>
+                        </aside>
+                    </div>
+                </main>
+            `;
+        }
+
+        function renderMuralDiocesano() {
+            const liturgia = globalInfoDB.liturgiaDiaria || { primeiraLeitura: {}, salmo: {}, evangelho: {} };
+            const santo = globalInfoDB.santoDoDia || {};
+            const festividades = globalInfoDB.festividadesSemana || [];
+            const anuncios = globalInfoDB.anuncios || [];
+
+            return `
+                <!-- Liturgia Diária -->
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="text-xl font-bold text-amber-800 mb-2"><i class="fa-solid fa-book-bible mr-2"></i>Liturgia Diária</h3>
+                    <p class="text-sm text-gray-500 mb-3">${liturgia.data || 'Carregando...'}</p>
+                    <div class="space-y-2 text-sm">
+                        ${renderCollapsible('1ª Leitura', liturgia.primeiraLeitura.ref, liturgia.primeiraLeitura.texto)}
+                        ${renderCollapsible('Salmo', liturgia.salmo.ref, liturgia.salmo.texto)}
+                        ${renderCollapsible('Evangelho', liturgia.evangelho.ref, liturgia.evangelho.texto)}
+                    </div>
+                </div>
+
+                <!-- Santo do Dia -->
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="text-xl font-bold text-amber-800 mb-2"><i class="fa-solid fa-person-praying mr-2"></i>Santo do Dia</h3>
+                    <img src="${santo.imagemUrl || 'https://placehold.co/300x200/a9a9a9/FFFFFF?text=Santo+do+Dia'}" class="w-full h-32 object-cover rounded-md my-2">
+                    <h4 class="font-bold text-gray-700">${santo.nome || 'Carregando...'}</h4>
+                    <p class="text-sm text-gray-600 mt-1">${santo.bio || ''}</p>
+                </div>
+
+                <!-- Festividades da Semana -->
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="text-xl font-bold text-amber-800 mb-2"><i class="fa-solid fa-calendar-days mr-2"></i>Festividades da Semana</h3>
+                    <ul class="space-y-2">
+                        ${festividades.length > 0 ? festividades.map(f => `
+                            <li class="text-sm border-l-4 border-amber-200 pl-3">
+                                <span class="font-bold text-gray-700">${f.dia}:</span>
+                                <span class="text-gray-600">${f.evento} (${f.local})</span>
+                            </li>
+                        `).join('') : '<li class="text-sm text-gray-500">Nenhuma festividade cadastrada.</li>'}
+                    </ul>
+                </div>
+
+                <!-- Anúncios -->
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="text-xl font-bold text-amber-800 mb-2"><i class="fa-solid fa-bullhorn mr-2"></i>Anúncios</h3>
+                     <ul class="space-y-2">
+                        ${anuncios.length > 0 ? anuncios.map(a => `
+                            <li class="text-sm">
+                                <span class="font-bold text-gray-700">${a.titulo}:</span>
+                                <span class="text-gray-600">${a.descricao}</span>
+                            </li>
+                        `).join('') : '<li class="text-sm text-gray-500">Nenhum anúncio cadastrado.</li>'}
+                    </ul>
+                </div>
+            `;
+        }
+
+        function renderCollapsible(title, ref, text) {
+            if (!ref || !text) return ''; // Não renderiza se não houver dados
+            const id = `collapsible-${ref.replace(/[^a-zA-Z0-9]/g, '')}`;
+            return `
+                <div>
+                    <button onclick="toggleCollapsible('${id}')" class="w-full text-left font-semibold text-gray-700 hover:text-amber-800">
+                        <i class="fa-solid fa-caret-right mr-2 transition-transform"></i>${title} - <span class="font-normal">${ref}</span>
+                    </button>
+                    <div id="${id}" class="collapsible-content pl-5 pt-2 border-l-2 border-gray-200 ml-2">
+                        <p class="text-gray-600">${text}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderDetailsPage() {
+            // Usa os dados do cache 'igrejasDB'
+            const igreja = igrejasDB.find(i => i.id === state.selectedChurchId);
+            if (!igreja) { renderHomePage(); return; }
+
+            appContainer.innerHTML = `
+                <header class="bg-white shadow-md p-6 rounded-b-lg">
+                    <button onclick="navigateTo('home')" class="mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+                        <i class="fa-solid fa-arrow-left mr-2"></i>Voltar para a lista
+                    </button>
+                </header>
+                <main class="bg-white m-6 p-8 rounded-lg shadow-lg">
+                    <img class="w-full h-64 object-cover rounded-lg mb-6" src="${igreja.fotoUrl || 'https://placehold.co/600x400/c2b280/FFFFFF?text=Sem+Foto'}" alt="Foto da ${igreja.nome}">
+                    <h1 class="text-4xl font-bold text-gray-900">${igreja.nome}</h1>
+                    <p class="text-lg text-gray-600 mt-2">Pároco: ${igreja.paroco}</p>
+
+                    <div class="mt-8 grid md:grid-cols-2 gap-8">
+                        <div>
+                            <h2 class="text-2xl font-bold text-amber-800 mb-4 border-b-2 border-amber-200 pb-2"><i class="fa-solid fa-church mr-2"></i>Informações</h2>
+                            <p class="text-gray-700 mb-2"><i class="fa-solid fa-location-dot w-6"></i> ${igreja.endereco}</p>
+                            <p class="text-gray-700 mb-2"><i class="fa-solid fa-phone w-6"></i> ${igreja.telefone}</p>
+                            <p class="text-gray-700"><i class="fa-solid fa-envelope w-6"></i> ${igreja.email}</p>
+                        </div>
+                         <div>
+                            <h2 class="text-2xl font-bold text-amber-800 mb-4 border-b-2 border-amber-200 pb-2"><i class="fa-solid fa-cross mr-2"></i>Confissões</h2>
+                            <p class="text-gray-700">${igreja.confissoes}</p>
+                        </div>
+                    </div>
+                   
+                    <div class="mt-8">
+                        <h2 class="text-2xl font-bold text-amber-800 mb-4 border-b-2 border-amber-200 pb-2"><i class="fa-solid fa-clock mr-2"></i>Horários das Missas</h2>
+                        <div class="space-y-2">
+                        ${(igreja.missas || []).map(m => `
+                            <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                                <span class="font-semibold text-gray-700">${m.dia}</span>
+                                <span class="text-gray-600">${m.horarios}</span>
+                            </div>
+                        `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <h2 class="text-2xl font-bold text-amber-800 mb-4 border-b-2 border-amber-200 pb-2"><i class="fa-solid fa-bullhorn mr-2"></i>Mural de Avisos</h2>
+                        <div class="space-y-4">
+                        ${(igreja.avisos || []).length > 0 ? igreja.avisos.map(a => `
+                            <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+                                <h3 class="font-bold text-amber-900">${a.titulo} - ${a.data}</h3>
+                                <p class="text-amber-800">${a.descricao}</p>
+                            </div>
+                        `).join('') : '<p class="text-gray-600">Nenhum aviso no momento.</p>'}
+                        </div>
+                    </div>
+                </main>
+            `;
+        }
+
+        function renderAdminLoginPage() {
+             appContainer.innerHTML = `
+                ${renderHeader('Unus Dominus - Acesso Restrito', 'Painel de Gerenciamento da Paróquia.', false)}
+                <main class="p-6">
+                    <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg mt-10">
+                         <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Login do Administrador</h2>
+                         <div id="login-error" class="hidden text-red-600 bg-red-100 p-3 rounded-lg mb-4"></div>
+                         <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-700 font-bold mb-2">Email</label>
+                                <input type="email" id="login-email" class="w-full p-3 rounded-lg border border-gray-300">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 font-bold mb-2">Senha</label>
+                                <input type="password" id="login-password" class="w-full p-3 rounded-lg border border-gray-300">
+                            </div>
+                         </div>
+                         <button id="login-button" onclick="handleAdminLogin()" class="w-full mt-6 bg-amber-800 text-white font-bold py-3 px-4 rounded-lg hover:bg-amber-900 transition-colors">
+                            Entrar
+                         </button>
+                         <button onclick="navigateTo('home')" class="w-full mt-4 bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+                            Voltar ao Site
+                         </button>
+                    </div>
+                </main>
+             `;
+        }
+
+        async function renderAdminPanel() {
+            // Esta função agora busca os dados da paróquia do admin logado
+            if (!state.currentUser) {
+                navigateTo('adminLogin');
+                return;
+            }
+
+            // Mostra um loading enquanto busca os dados da paróquia
+            appContainer.innerHTML = `<div id="loading-screen" class="flex items-center justify-center h-screen"><div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div></div>`;
+            
+            try {
+                // Busca a paróquia que este usuário gerencia
+                // No Firestore, o campo 'ownerUid' deve conter o UID do usuário
+                const querySnapshot = await db.collection('parishes').where('ownerUid', '==', state.currentUser.uid).get();
+                
+                if (querySnapshot.empty) {
+                    alert('Erro: Você fez login, mas sua conta não está associada a nenhuma paróquia.');
+                    handleAdminLogout();
+                    return;
+                }
+                
+                // Pega o primeiro resultado (só deve haver um)
+                const parishDoc = querySnapshot.docs[0];
+                state.adminChurchId = parishDoc.id; // Armazena o ID do documento
+                const igreja = parishDoc.data();
+
+                // Formata os dados para os textareas
+                const missasText = (igreja.missas || []).map(m => `${m.dia}: ${m.horarios}`).join('\n');
+                const avisosText = (igreja.avisos || []).map(a => `${a.titulo}|${a.data}|${a.descricao}`).join('\n');
+
+                appContainer.innerHTML = `
+                    ${renderHeader(`Gerenciando: ${igreja.nome}`, 'Faça as alterações e clique em salvar.', false)}
+                     <main class="p-6">
+                        <form id="admin-form" class="bg-white p-8 rounded-lg shadow-lg space-y-6">
+                            <div>
+                                <label class="block text-gray-700 font-bold mb-2">Horários das Missas</label>
+                                <p class="text-sm text-gray-500 mb-2">Formato: Dia da Semana: HH:MM, HH:MM (uma linha por dia)</p>
+                                <textarea id="missas-input" rows="5" class="w-full p-3 rounded-lg border border-gray-300">${missasText}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 font-bold mb-2">Horários de Confissão</label>
+                                <textarea id="confissoes-input" rows="3" class="w-full p-3 rounded-lg border border-gray-300">${igreja.confissoes || ''}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 font-bold mb-2">Mural de Avisos</label>
+                                 <p class="text-sm text-gray-500 mb-2">Formato: Título|DD/MM/AAAA|Descrição (um aviso por linha)</p>
+                                <textarea id="avisos-input" rows="5" class="w-full p-3 rounded-lg border border-gray-300">${avisosText}</textarea>
+                            </div>
+                            <!-- TODO: Adicionar upload de foto (fotoUrl) -->
+                            <div class="flex justify-end space-x-4">
+                                 <button type="button" onclick="handleAdminLogout()" class="bg-gray-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-600">Sair</button>
+                                 <button type="button" id="save-button" onclick="handleSaveChanges()" class="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700">Salvar Alterações</button>
+                            </div>
+                        </form>
+                        <!-- TODO: Adicionar painel do Super Admin para editar 'globalContent' -->
+                     </main>
+                `;
+
+            } catch (error) {
+                console.error("Erro ao carregar painel de admin:", error);
+                alert(`Erro ao carregar dados: ${error.message}`);
+                handleAdminLogout();
+            }
+        }
+
+        // --- 7. MANIPULADORES DE EVENTOS (HANDLERS) ---
+
+        function toggleCollapsible(id) {
+            const content = document.getElementById(id);
+            const icon = content.previousElementSibling.querySelector('i');
+            if (content.style.maxHeight) {
+                content.style.maxHeight = null;
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.maxHeight = content.scrollHeight + "px";
+                icon.style.transform = 'rotate(90deg)';
+            }
+        }
+
+        function handleSearch(term) {
+            state.searchTerm = term;
+            renderHomePage(); // Filtra a lista `igrejasDB` que já está na memória
+        }
+        
+        async function handleAdminLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorDiv = document.getElementById('login-error');
+            const loginButton = document.getElementById('login-button');
+
+            loginButton.disabled = true;
+            loginButton.innerText = 'Entrando...';
+
+            try {
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                state.currentUser = userCredential.user;
+                errorDiv.classList.add('hidden');
+                navigateTo('adminPanel'); // Navega para o painel de admin
+            } catch (error) {
+                console.error("Erro de login:", error.message);
+                errorDiv.innerText = `Erro: ${error.code.includes('user-not-found') ? 'Usuário não encontrado.' : error.code.includes('wrong-password') ? 'Senha incorreta.' : 'Email ou senha inválidos.'}`;
+                errorDiv.classList.remove('hidden');
+                loginButton.disabled = false;
+                loginButton.innerText = 'Entrar';
+            }
+        }
+
+        async function handleAdminLogout() {
+            await auth.signOut();
+            state.currentUser = null;
+            state.adminChurchId = null;
+            navigateTo('home');
+        }
+
+        async function handleSaveChanges() {
+            if (!state.adminChurchId) {
+                alert('Erro: ID da paróquia não encontrado. Faça login novamente.');
+                return;
+            }
+
+            const saveButton = document.getElementById('save-button');
+            saveButton.disabled = true;
+            saveButton.innerText = 'Salvando...';
+
+            // 1. Coletar dados do formulário
+            const missasText = document.getElementById('missas-input').value.trim();
+            const missasArray = missasText.split('\n').map(line => {
+                const parts = line.split(':');
+                return { dia: parts[0]?.trim(), horarios: parts[1]?.trim() };
+            }).filter(m => m.dia && m.horarios);
+
+            const confissoesText = document.getElementById('confissoes-input').value.trim();
+
+            const avisosText = document.getElementById('avisos-input').value.trim();
+            const avisosArray = avisosText.split('\n').map((line, index) => {
+                 const parts = line.split('|');
+                 return { id: `a${index + 1}`, titulo: parts[0]?.trim(), data: parts[1]?.trim(), descricao: parts[2]?.trim() };
+            }).filter(a => a.titulo && a.data && a.descricao);
+
+            // 2. Criar o objeto de atualização
+            const dataToUpdate = {
+                missas: missasArray,
+                confissoes: confissoesText,
+                avisos: avisosArray
+                // TODO: Adicionar lógica de upload de foto e salvar a `fotoUrl`
+            };
+
+            // 3. Enviar a atualização para o Firestore
+            try {
+                const parishRef = db.collection('parishes').doc(state.adminChurchId);
+                await parishRef.update(dataToUpdate);
+                
+                alert('Alterações salvas com sucesso!');
+                
+                // Atualiza o cache local para refletir no site público sem recarregar
+                const igrejaIndex = igrejasDB.findIndex(i => i.id === state.adminChurchId);
+                if (igrejaIndex > -1) {
+                    igrejasDB[igrejaIndex] = { ...igrejasDB[igrejaIndex], ...dataToUpdate };
+                }
+
+            } catch (error) {
+                console.error("Erro ao salvar alterações:", error);
+                alert(`Erro ao salvar: ${error.message}`);
+            } finally {
+                saveButton.disabled = false;
+                saveButton.innerText = 'Salvar Alterações';
+            }
+        }
+
+        // --- 8. ROTEADOR PRINCIPAL ---
+        function navigateTo(page, id = null) {
+            state.currentPage = page;
+            if (id) {
+                state.selectedChurchId = id;
+            }
+            main();
+        }
+
+        function main() {
+            // Oculta a tela de loading se ela ainda estiver visível
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) loadingScreen.style.display = 'none';
+
+            switch (state.currentPage) {
+                case 'details':
+                    renderDetailsPage();
+                    break;
+                case 'adminLogin':
+                    renderAdminLoginPage();
+                    break;
+                case 'adminPanel':
+                    renderAdminPanel();
+                    break;
+                case 'home':
+                default:
+                    // Se os dados principais (paróquias) ainda não foram carregados,
+                    // renderHomePage() será chamada por loadInitialData()
+                    if (igrejasDB.length > 0) {
+                        renderHomePage();
+                    }
+                    break;
+            }
+        }
+        
+        // --- 9. INICIALIZAÇÃO ---
+        // Monitora o estado de autenticação EM TEMPO REAL
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // Usuário está logado
+                state.currentUser = user;
+                // Se o usuário estiver logado e tentar ir para 'home',
+                // nós o levamos para o painel de admin
+                if (state.currentPage === 'home' || state.currentPage === 'adminLogin') {
+                    navigateTo('adminPanel');
+                }
+            } else {
+                // Usuário está deslogado
+                state.currentUser = null;
+                // Se o usuário estava no painel de admin, ele é deslogado
+                // e enviado para a home
+                if (state.currentPage === 'adminPanel') {
+                    navigateTo('home');
+                }
+            }
+        });
+
+        // Carrega os dados do Firestore e inicia a aplicação
+        loadInitialData();
+
+    </script>
+</body>
+</html>
+
