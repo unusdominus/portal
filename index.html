@@ -37,15 +37,20 @@
 
     <script>
         // --- 3. CONFIGURAÇÃO DO FIREBASE ---
-        // ATENÇÃO: Substitua este objeto pelas credenciais do SEU projeto
-        // Você encontra isso no Console do Firebase > Configurações do Projeto
+        // ATENÇÃO: Substitua este objeto pelas credenciais do SEU projeto "unusdominus"
+        // 1. Vá ao Console do Firebase (console.firebase.google.com)
+        // 2. Abra o projeto "unusdominus"
+        // 3. Vá em "Configurações do Projeto" (ícone de engrenagem no menu lateral)
+        // 4. Role para baixo até "Seus aplicativos"
+        // 5. Se não houver um app Web, clique no ícone </> (Web) e registre um (dê o nome "web-portal")
+        // 6. Após registrar, o Firebase mostrará o objeto 'firebaseConfig'. Copie e cole ele aqui.
         const firebaseConfig = {
-            apiKey: "SEU_API_KEY",
-            authDomain: "SEU_AUTH_DOMAIN",
-            projectId: "SEU_PROJECT_ID",
-            storageBucket: "SEU_STORAGE_BUCKET",
-            messagingSenderId: "SEU_MESSAGING_SENDER_ID",
-            appId: "SEU_APP_ID"
+            apiKey: "COLE_SUA_API_KEY_AQUI",
+            authDomain: "unusdominus.firebaseapp.com", // Provavelmente será assim
+            projectId: "unusdominus", // Este deve ser o ID do seu projeto
+            storageBucket: "unusdominus.appspot.com", // Provavelmente será assim
+            messagingSenderId: "COLE_SEU_MESSAGING_SENDER_ID_AQUI",
+            appId: "COLE_SEU_APP_ID_AQUI"
         };
 
         // Inicializa o Firebase
