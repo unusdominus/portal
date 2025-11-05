@@ -177,15 +177,23 @@
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
         // --- 3. CONFIGURAÇÃO DO FIREBASE ---
-        // ATENÇÃO: SUBSTITUA COM AS SUAS CHAVES REAIS DO FIREBASE
-        const firebaseConfig = {
-            apiKey: "COLE_SUA_API_KEY_AQUI",
-            authDomain: "COLE_SEU_AUTH_DOMAIN_AQUI",
-            projectId: "COLE_SEU_PROJECT_ID_AQUI",
-            storageBucket: "COLE_SEU_STORAGE_BUCKET_AQUI",
-            messagingSenderId: "COLE_SEU_MESSAGING_SENDER_ID_AQUI",
-            appId: "COLE_SEU_APP_ID_AQUI"
-        };
+              
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCN8Wm-XqTkD4tcjlF-tTusRO92JA0c0Y0",
+  authDomain: "unusdominus.firebaseapp.com",
+  projectId: "unusdominus",
+  storageBucket: "unusdominus.firebasestorage.app",
+  messagingSenderId: "1040204777601",
+  appId: "1:1040204777601:web:577008a19a846bc0462580",
+  measurementId: "G-FEDJMGTLRD"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
         // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
 
@@ -780,4 +788,5 @@
     </script>
 </body>
 </html>
+
 
