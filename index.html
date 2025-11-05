@@ -177,23 +177,16 @@
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
         // --- 3. CONFIGURAÇÃO DO FIREBASE ---
-              
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCN8Wm-XqTkD4tcjlF-tTusRO92JA0c0Y0",
-  authDomain: "unusdominus.firebaseapp.com",
-  projectId: "unusdominus",
-  storageBucket: "unusdominus.firebasestorage.app",
-  messagingSenderId: "1040204777601",
-  appId: "1:1040204777601:web:577008a19a846bc0462580",
-  measurementId: "G-FEDJMGTLRD"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+        // ATENÇÃO: SUBSTITUA COM AS SUAS CHAVES REAIS DO FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCN8Wm-XqTkD4tcjlF-tTusRO92JA0c0Y0",
+            authDomain: "unusdominus.firebaseapp.com",
+            projectId: "unusdominus",
+            storageBucket: "unusdominus.firebasestorage.app",
+            messagingSenderId: "1040204777601",
+            appId: "1:1040204777601:web:577008a19a846bc0462580"
+            measurementId: "G-FEDJMGTLRD"
+        };
         // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
 
@@ -638,7 +631,7 @@ const analytics = getAnalytics(app);
                     const CLOUDINARY_UPLOAD_PRESET = "ml_default";
                     // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
-                    if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
+                    if (CLOUDINARY_CLOUD_NAME === "dmmij5gpl") {
                         throw new Error("Cloudinary não configurado. Adicione seu Cloud Name e Upload Preset.");
                     }
 
@@ -788,5 +781,3 @@ const analytics = getAnalytics(app);
     </script>
 </body>
 </html>
-
-
