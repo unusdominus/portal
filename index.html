@@ -637,23 +637,23 @@
                     const CLOUDINARY_UPLOAD_PRESET = "ml_default";
                     // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
-                    if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
+                    if (CLOUDINARY_CLOUD_NAME === "dmmj5gp1") {
                         throw new Error("Cloudinary não configurado. Adicione seu Cloud Name e Upload Preset.");
                     }
                     
-                    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                    const allowedTypes = ['image/jpeg','image/jpg', 'image/png', 'image/webp'];
                     if (!allowedTypes.includes(file.type)) {
-                        throw new Error('Tipo de arquivo não permitido. Use JPEG, PNG ou WEBP.');
+                        throw new Error('Tipo de arquivo não permitido. Use JPG, JPEG, PNG ou WEBP.');
                     }
 
                     const formData = new FormData();
                     formData.append("file", file);
-                    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+                    formData.append("upload_preset", "ml_default");
                     formData.append("resource_type", "image");
                     
                     feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando imagem ao Cloudinary...</p>';
 
-                    const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+                    const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${dmmj5gp1}/image/upload`, {
                         method: "POST",
                         body: formData
                     });
@@ -803,3 +803,4 @@
     </script>
 </body>
 </html>
+
