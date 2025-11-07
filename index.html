@@ -184,7 +184,7 @@
             projectId: "unusdominus",
             storageBucket: "unusdominus.firebasestorage.app",
             messagingSenderId: "1040204777601",
-            appId: "1:1040204777601:web:577008a19a846bc0462580"
+            appId: "1:1040204777601:web:577008a19a846bc0462580",
         };
         // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
@@ -452,7 +452,15 @@
 
         // Mostra o Modal de Login
         document.getElementById("parish-login-button").addEventListener("click", () => {
-            document.getElementById("login-modal").classList.remove("hidden");
+             // Se o usuário estiver logado, o botão agora é de "Sair"
+            if (auth.currentUser) {
+                if (confirm("Tem certeza que deseja sair do painel?")) {
+                    signOut(auth);
+                }
+            } else {
+                // Se estiver deslogado, abre o modal de login
+                document.getElementById("login-modal").classList.remove("hidden");
+            }
         });
 
         // Cancela o Login
@@ -522,7 +530,7 @@
             }
         }
         
-        // Renderiza o HTML do Painel de Admin
+        // Renderiza o HTML do Painel de Admin (VERSÃO COMPLETA)
         function renderAdminPanel(parish, userEmail) {
             const panel = document.getElementById("admin-panel");
             
@@ -536,9 +544,7 @@
                         <h2 class="text-2xl font-bold text-yellow-700">Painel da ${parish.nome}</h2>
                         <p class="text-gray-500">Logado como: ${userEmail}</p>
                     </div>
-                    <button id="admin-logout-button" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition duration-200">
-                        Sair
-                    </button>
+                    <!-- O botão de Sair agora é o principal no topo -->
                 </div>
 
                 <form id="admin-form" class="space-y-6">
@@ -581,18 +587,15 @@
                         <textarea id="admin-avisos" rows="5" class="w-full p-2 border border-gray-300 rounded-lg mt-1 font-mono" placeholder="Formato: DD/MM | Título | Descrição (um por linha)&#10;Ex: 15/08 | Festa do Padroeiro | ...">${avisosText}</textarea>
                     </div>
 
-                    <!-- Imagem da Paróquia (REMOVIDO) -->
-                    <!-- 
-                        A funcionalidade de upload direto pelo painel foi removida
-                        devido às restrições de segurança do Cloudinary que impedem
-                        o upload "unsigned" sem uma configuração que não está disponível
-                        na interface do utilizador.
-
-                        Para atualizar a foto de uma paróquia, o admin-geral (você)
-                        deve fazer o upload manual da imagem no painel do Cloudinary
-                        e colar o URL diretamente no campo 'fotoUrl' do documento
-                        da paróquia no Firestore.
-                    -->
+                    <!-- Imagem da Paróquia (Cloudinary) -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-lg font-semibold mb-2">Foto da Paróquia</h3>
+                        <p class="text-sm text-gray-500 mb-2">Para alterar, escolha uma nova foto abaixo. A imagem antiga será substituída.</p>
+                        <div class="flex items-center space-x-4">
+                            <img src="${parish.fotoUrl || 'https://placehold.co/100x100/c2b280/FFFFFF?text=Sem+Foto'}" alt="Foto atual" class="w-24 h-24 object-cover rounded-lg border" id="admin-foto-preview">
+                            <input type="file" id="admin-foto" accept="image/png, image/jpeg, image/webp">
+                        </div>
+                    </div>
 
                     <!-- Salvar -->
                     <div id="admin-save-feedback" class="h-10"></div>
@@ -603,18 +606,11 @@
                 </form>
             `;
             
-            // Adiciona evento de logout
-            document.getElementById("admin-logout-button").addEventListener("click", async () => {
-                if (confirm("Tem certeza que deseja sair do painel?")) {
-                    await signOut(auth);
-                }
-            });
-
             // Adiciona evento de salvar
             document.getElementById("admin-form").addEventListener("submit", handleSaveChanges);
         }
 
-        // Função para Salvar as Mudanças do Admin (Com Upload para Cloudinary)
+        // Função para Salvar as Mudanças do Admin (VERSÃO COMPLETA)
         async function handleSaveChanges(e) {
             e.preventDefault();
             
@@ -629,11 +625,57 @@
 
             try {
                 let newFotoUrl = null;
-                const fileInput = document.getElementById("admin-foto"); // Esta linha não vai mais encontrar o elemento
+                const fileInput = document.getElementById("admin-foto");
+                const file = fileInput.files[0];
 
-                // ETAPA 1: Upload da Imagem (REMOVIDO)
-                // O código de upload do Cloudinary foi removido.
+                // ETAPA 1: Upload da Imagem (se houver)
+                if (file) {
+                    console.log("Iniciando upload para o Cloudinary...");
+                    
+                    // --- CONFIGURAÇÃO DO CLOUDINARY ---
+                    const CLOUDINARY_CLOUD_NAME = "dmmj5gp1";
+                    const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+                    // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
+                    if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
+                        throw new Error("Cloudinary não configurado. Adicione seu Cloud Name e Upload Preset.");
+                    }
+                    
+                    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                    if (!allowedTypes.includes(file.type)) {
+                        throw new Error('Tipo de arquivo não permitido. Use JPEG, PNG ou WEBP.');
+                    }
+
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+                    formData.append("resource_type", "image");
+                    
+                    feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando imagem ao Cloudinary...</p>';
+
+                    const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    const text = await uploadResponse.text();
+                    let uploadResult;
+                    try {
+                        uploadResult = JSON.parse(text);
+                    } catch (e) {
+                        throw new Error("Resposta inesperada do Cloudinary: " + text);
+                    }
+
+                    if (!uploadResponse.ok) {
+                        const errMsg = uploadResult.error?.message || text || "Erro desconhecido no upload.";
+                        throw new Error("Falha no upload: " + errMsg + " — Verifique se o preset 'ml_default' está configurado como 'unsigned' e se as 'Allowed upload origins' estão corretas no painel do Cloudinary.");
+                    }
+
+                    newFotoUrl = uploadResult.secure_url;
+                    console.log('Upload da imagem concluído:', newFotoUrl);
+                } else {
+                    console.log("Nenhuma nova imagem selecionada. Pulando upload.");
+                }
 
                 // ETAPA 2: Preparar Dados do Formulário
                 feedbackDiv.innerHTML = '<p class="text-blue-600">Atualizando banco de dados...</p>';
@@ -674,9 +716,9 @@
                 };
 
                 // Adiciona a nova foto APENAS se o upload foi feito
-                // if (newFotoUrl) { // REMOVIDO
-                //    dataToUpdate.fotoUrl = newFotoUrl;
-                // }
+                if (newFotoUrl) {
+                    dataToUpdate.fotoUrl = newFotoUrl;
+                }
 
                 // ETAPA 3: Salvar no Firestore
                 const docRef = doc(db, "parishes", currentAdminParishId);
@@ -686,9 +728,9 @@
                 feedbackDiv.innerHTML = '<p class="text-green-600 font-semibold">Alterações salvas com sucesso!</p>';
                 
                 // Atualiza a imagem no painel de admin se ela foi alterada
-                // if (newFotoUrl) { // REMOVIDO
-                //     document.querySelector("#admin-panel img").src = newFotoUrl;
-                // }
+                if (newFotoUrl) {
+                    document.getElementById("admin-foto-preview").src = newFotoUrl;
+                }
                 
                 // Limpa o feedback após 3 segundos
                 setTimeout(() => { feedbackDiv.innerHTML = ''; }, 3000);
