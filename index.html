@@ -48,13 +48,13 @@
             <!-- 2.1. DESTAQUE PRINCIPAL E MURAL DIOCESANO -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Destaque Principal (2/3) -->
-                <div id="destaque-loading" class="md:col-span-2 bg-white shadow-lg rounded-lg p-6 animate-pulse h-96">Carregando destaques...</div>
+                <div id="destaque-loading" class="md:col-span-2 bg-white shadow-lg rounded-lg p-6 animate-pulse h-96 flex items-center justify-center">Carregando destaques...</div>
                 <div id="destaque-content" class="md:col-span-2 bg-white shadow-lg rounded-lg overflow-hidden hidden">
                     <!-- Conteúdo será preenchido pelo JavaScript -->
                 </div>
 
                 <!-- Mural Diocesano (1/3) -->
-                <div id="mural-loading" class="bg-white shadow-lg rounded-lg p-6 animate-pulse h-96">Carregando mural...</div>
+                <div id="mural-loading" class="bg-white shadow-lg rounded-lg p-6 animate-pulse h-96 flex items-center justify-center">Carregando mural...</div>
                 <div id="mural-content" class="bg-white shadow-lg rounded-lg overflow-hidden hidden">
                     <div class="p-6">
                         <h2 class="text-2xl font-bold text-yellow-700 mb-4">Mural Diocesano</h2>
@@ -166,7 +166,7 @@
     
 
     <script type="module">
-        // --- 2. IMPORTAÇÕES DOS MÓDULOS FIREBASE ---
+        // --- 2. IMPORTAÇÕES DOS MÓCULOS FIREBASE ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
             getFirestore, collection, doc, getDoc, getDocs, onSnapshot,
@@ -185,7 +185,6 @@
             storageBucket: "unusdominus.firebasestorage.app",
             messagingSenderId: "1040204777601",
             appId: "1:1040204777601:web:577008a19a846bc0462580"
-            measurementId: "G-FEDJMGTLRD"
         };
         // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
@@ -223,7 +222,7 @@
                         
                         // Renderiza Destaque
                         const destaqueContainer = document.getElementById("destaque-content");
-                        if (data.destaquePrincipal) {
+                        if (data?.destaquePrincipal) {
                             destaqueContainer.innerHTML = `
                                 <img src="${data.destaquePrincipal.imagemUrl || 'https://placehold.co/800x400/c2b280/FFFFFF?text=Destaque'}" alt="${data.destaquePrincipal.titulo}" class="w-full h-64 object-cover">
                                 <div class="p-6">
@@ -232,14 +231,14 @@
                                 </div>
                             `;
                             document.getElementById("destaque-loading").style.display = 'none';
-                            destaqueContainer.style.display = 'block';
+                            destaqueContainer.classList.remove("hidden");
                         }
                         
                         // Renderiza Mural
                         const muralContainer = document.getElementById("mural-content");
                         
                         // Liturgia
-                        if (data.liturgiaDiaria) {
+                        if (data?.liturgiaDiaria) {
                             const liturgia = data.liturgiaDiaria;
                             document.getElementById("tab-liturgia").innerHTML = `
                                 <h4 class="font-semibold text-gray-700">${liturgia.data || 'Leituras do Dia'}</h4>
@@ -249,22 +248,26 @@
                                     <p><strong>Evangelho:</strong> ${liturgia.evangelho?.ref || ''} - ${liturgia.evangelho?.texto ? liturgia.evangelho.texto.substring(0, 100) + '...' : ''}</p>
                                 </div>
                             `;
+                        } else {
+                             document.getElementById("tab-liturgia").innerHTML = '<p class="text-sm text-gray-500">Liturgia não disponível.</p>';
                         }
 
                         // Santo do Dia
-                        if (data.santoDoDia) {
+                        if (data?.santoDoDia) {
                             const santo = data.santoDoDia;
                             document.getElementById("tab-santo").innerHTML = `
                                 <img src="${santo.imagemUrl || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo'}" alt="${santo.nome}" class="w-full h-32 object-cover rounded-lg mb-2">
                                 <h4 class="font-semibold text-gray-700">${santo.nome}</h4>
                                 <p class="text-sm text-gray-600">${santo.bio ? santo.bio.substring(0, 150) + '...' : ''}</p>
                             `;
+                        } else {
+                             document.getElementById("tab-santo").innerHTML = '<p class="text-sm text-gray-500">Santo do dia não disponível.</p>';
                         }
 
                         // Eventos
                         const festasList = document.getElementById("festividades-list");
                         festasList.innerHTML = '';
-                        if (data.festividadesSemana && data.festividadesSemana.length > 0) {
+                        if (data?.festividadesSemana?.length > 0) {
                             data.festividadesSemana.forEach(f => {
                                 festasList.innerHTML += `<li><strong>${f.dia}:</strong> ${f.evento}</li>`;
                             });
@@ -274,7 +277,7 @@
 
                         const anunciosList = document.getElementById("anuncios-list");
                         anunciosList.innerHTML = '';
-                        if (data.anuncios && data.anuncios.length > 0) {
+                        if (data?.anuncios?.length > 0) {
                             data.anuncios.forEach(a => {
                                 anunciosList.innerHTML += `<li><strong>${a.titulo}:</strong> ${a.descricao}</li>`;
                             });
@@ -283,13 +286,16 @@
                         }
 
                         document.getElementById("mural-loading").style.display = 'none';
-                        muralContainer.style.display = 'block';
+                        muralContainer.classList.remove("hidden");
 
                     } else {
                         console.log("Documento global 'main' não encontrado!");
+                        document.getElementById("destaque-loading").innerText = "Conteúdo não encontrado.";
+                        document.getElementById("mural-loading").innerText = "Conteúdo não encontrado.";
                     }
                 }, (error) => {
                      console.error("Erro ao carregar dados globais do Firestore: ", error);
+                     // Se o erro for de permissão, o F12 mostrará
                 });
             } catch (error) {
                 console.error("Erro ao carregar conteúdo global:", error);
@@ -321,7 +327,7 @@
                                 <img src="${parish.fotoUrl || 'https://placehold.co/400x250/c2b280/FFFFFF?text=Igreja'}" alt="${parish.nome}" class="w-full h-48 object-cover">
                                 <div class="p-4">
                                     <h3 class="text-lg font-semibold text-yellow-700">${parish.nome}</h3>
-                                    <p class="text-sm text-gray-500 truncate">${parish.endereco}</p>
+                                    <p class="text-sm text-gray-500 truncate">${parish.endereco || 'Endereço não informado'}</p>
                                 </div>
                             </div>
                         `;
@@ -333,7 +339,8 @@
                     console.error("Erro ao carregar paróquias do Firestore: ", error);
                     document.getElementById("parishes-loading").innerText = "Erro ao carregar paróquias.";
                 });
-            } catch (error) {
+            } catch (error)
+ {
                 console.error("Erro ao carregar paróquias:", error);
             }
         }
@@ -360,7 +367,7 @@
                         <img src="${parish.fotoUrl || 'https://placehold.co/400x250/c2b280/FFFFFF?text=Igreja'}" alt="${parish.nome}" class="w-full h-48 object-cover">
                         <div class="p-4">
                             <h3 class="text-lg font-semibold text-yellow-700">${parish.nome}</h3>
-                            <p class="text-sm text-gray-500 truncate">${parish.endereco}</p>
+                            <p class="text-sm text-gray-500 truncate">${parish.endereco || 'Endereço não informado'}</p>
                         </div>
                     </div>
                 `;
@@ -377,12 +384,12 @@
             const content = document.getElementById("parish-modal-content");
             
             let missasHtml = '<li>Nenhum horário cadastrado.</li>';
-            if (parish.missas && parish.missas.length > 0) {
+            if (parish.missas?.length > 0) {
                 missasHtml = parish.missas.map(m => `<li><span class="font-semibold">${m.dia}:</span> ${m.horarios}</li>`).join('');
             }
 
             let avisosHtml = '<li>Nenhum aviso cadastrado.</li>';
-            if (parish.avisos && parish.avisos.length > 0) {
+            if (parish.avisos?.length > 0) {
                 avisosHtml = parish.avisos.map(a => `
                     <div class="bg-gray-50 border-l-4 border-yellow-600 p-4 mb-2 rounded-r-lg">
                         <h4 class="font-semibold">${a.titulo} (${a.data})</h4>
