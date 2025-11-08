@@ -237,6 +237,7 @@
         let parishesCache = []; // Cache local para busca rápida
         let currentAdminParish = null; // Guarda o objeto {id, nome} da paróquia logada
         let isSuperAdmin = false; // Flag para Super Admin
+        let parishAvisosUnsubscribe = null; // Para 'desligar' o listener de avisos
 
         // Variáveis do Carrossel
         let carouselTrack, carouselDots;
@@ -377,6 +378,7 @@
         }
 
         function nextSlide() {
+            if (slides.length === 0) return;
             const newIndex = (currentSlide + 1) % slides.length;
             goToSlide(newIndex);
         }
@@ -549,7 +551,7 @@
         }
         
         // Função para mostrar o modal de detalhes da paróquia
-        function showParishDetails(parishId) {
+        async function showParishDetails(parishId) {
             const parish = parishesCache.find(p => p.id === parishId);
             if (!parish) return;
 
@@ -561,16 +563,38 @@
                 missasHtml = parish.missas.map(m => `<li><span class="font-semibold">${m.dia}:</span> ${m.horarios}</li>`).join('');
             }
 
-            let avisosHtml = '<li>Nenhum aviso cadastrado.</li>';
-            if (parish.avisos?.length > 0) {
-                avisosHtml = parish.avisos.map(a => `
-                    <div class="bg-gray-50 border-l-4 border-yellow-600 p-4 mb-2 rounded-r-lg">
-                        <h4 class="font-semibold">${a.titulo} (${a.data})</h4>
-                        <p class="text-sm">${a.descricao}</p>
-                    </div>
-                `).join('');
-            }
+            // NOVO: Carrega avisos da subcoleção
+            let avisosHtml = '<li>Carregando avisos...</li>';
+            content.innerHTML = `<div class="p-10 text-center"><div class="loading-spinner inline-block" style="border-left-color: #b45309;"></div></div>`;
+            modal.classList.remove('hidden');
 
+            try {
+                const avisosColRef = collection(db, "parishes", parishId, "avisos");
+                const q = query(avisosColRef, orderBy("dataPublicacao", "desc"), limit(10));
+                const avisosSnapshot = await getDocs(q);
+                
+                if (avisosSnapshot.empty) {
+                    avisosHtml = '<li>Nenhum aviso cadastrado.</li>';
+                } else {
+                    avisosHtml = avisosSnapshot.docs.map(doc => {
+                        const aviso = doc.data();
+                        const dataAv = aviso.dataPublicacao.toDate().toLocaleDateString('pt-BR');
+                        return `
+                            <div class="bg-gray-50 border-l-4 border-yellow-600 p-4 mb-2 rounded-r-lg">
+                                <h4 class="font-semibold">${aviso.titulo}</h4>
+                                <p class="text-sm text-gray-500 mb-1">${dataAv}</p>
+                                <p class="text-sm">${aviso.descricao}</p>
+                                ${aviso.imagemUrl ? `<img src="${aviso.imagemUrl}" alt="Imagem do aviso" class="mt-2 rounded-lg w-full h-48 object-cover">` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (err) {
+                console.error("Erro ao buscar avisos da subcoleção:", err);
+                avisosHtml = '<li>Erro ao carregar avisos.</li>';
+            }
+            
+            // Renderiza o conteúdo completo do modal
             content.innerHTML = `
                 <img src="${parish.fotoUrl || 'https://placehold.co/600x300/c2b280/FFFFFF?text=Igreja'}" alt="${parish.nome}" class="w-full h-64 object-cover rounded-t-lg">
                 <div class="p-6 space-y-4">
@@ -604,7 +628,6 @@
                     </button>
                 </div>
             `;
-            modal.classList.remove('hidden');
         }
 
 
@@ -647,8 +670,7 @@
             
             // Converte arrays em campos de texto simples
             const missasText = (parish.missas || []).map(m => `${m.dia}: ${m.horarios}`).join('\n');
-            const avisosText = (parish.avisos || []).map(a => `${a.data} | ${a.titulo} | ${a.descricao}`).join('\n');
-
+            
             // Painel 1: Editar Informações da Paróquia
             const parishEditor = document.createElement('div');
             parishEditor.className = "bg-white shadow-lg rounded-lg p-6 md:p-8";
@@ -693,12 +715,6 @@
                         <input type="text" id="admin-confissoes" value="${parish.confissoes || ''}" class="w-full p-2 border border-gray-300 rounded-lg mt-1">
                     </div>
 
-                    <!-- ... (Campo: Avisos) ... -->
-                    <div class="border-b pb-6">
-                        <h3 class="text-lg font-semibold mb-2">Mural de Avisos</h3>
-                        <textarea id="admin-avisos" rows="5" class="w-full p-2 border border-gray-300 rounded-lg mt-1 font-mono" placeholder="Formato: DD/MM | Título | Descrição (um por linha)&#10;Ex: 15/08 | Festa do Padroeiro | ...">${avisosText}</textarea>
-                    </div>
-
                     <!-- ... (Campo: Foto da Paróquia) ... -->
                     <div class="border-b pb-6">
                         <h3 class="text-lg font-semibold mb-2">Foto da Paróquia</h3>
@@ -712,48 +728,129 @@
                     <!-- ... (Botão Salvar) ... -->
                     <div id="admin-save-feedback" class="h-10"></div>
                     <button type="submit" id="admin-save-button" class="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 transition duration-200 flex items-center justify-center">
-                        <span class="button-text">Salvar Alterações da Paróquia</span>
+                        <span class="button-text">Salvar Alterações (Infos e Foto)</span>
                         <div class="loading-spinner hidden"></div>
                     </button>
                 </form>
             `;
             panel.appendChild(parishEditor);
             
-            // Painel 2: Solicitar Destaque de Evento
-            const eventRequester = document.createElement('div');
-            eventRequester.className = "bg-white shadow-lg rounded-lg p-6 md:p-8 mt-6";
-            eventRequester.innerHTML = `
-                <h2 class="text-2xl font-bold text-yellow-700 mb-6">Solicitar Destaque de Evento</h2>
-                <form id="destaque-request-form" class="space-y-6">
-                    <p class="text-sm text-gray-500">Envie um evento para aprovação do administrador do site. Se aprovado, ele aparecerá no carrossel da página inicial.</p>
+            // Painel 2: Gerenciador de Avisos e Eventos
+            const eventManager = document.createElement('div');
+            eventManager.className = "bg-white shadow-lg rounded-lg p-6 md:p-8 mt-6";
+            eventManager.innerHTML = `
+                <h2 class="text-2xl font-bold text-yellow-700 mb-6">Mural de Avisos e Eventos</h2>
+                
+                <!-- Formulário para Novo Aviso -->
+                <form id="aviso-form" class="space-y-4 p-4 border rounded-lg bg-gray-50">
+                    <h3 class="text-lg font-semibold">Adicionar Novo Aviso / Evento</h3>
                     <div>
-                        <label class="block text-sm font-medium">Título do Evento*</label>
-                        <input type="text" id="request-titulo" class="w-full p-2 border border-gray-300 rounded-lg mt-1" required>
+                        <label class="block text-sm font-medium">Título*</label>
+                        <input type="text" id="aviso-titulo" class="w-full p-2 border border-gray-300 rounded-lg mt-1" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium">Data e Hora do Evento*</label>
-                        <input type="datetime-local" id="request-data" class="w-full p-2 border border-gray-300 rounded-lg mt-1" required>
+                        <label class="block text-sm font-medium">Descrição*</label>
+                        <textarea id="aviso-descricao" rows="3" class="w-full p-2 border border-gray-300 rounded-lg mt-1" required></textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium">Imagem de Destaque*</label>
-                        <input type="file" id="request-foto" class="w-full" accept="image/png, image/jpeg, image/webp" required>
+                        <label class="block text-sm font-medium">Imagem (Opcional - para destaque)</label>
+                        <input type="file" id="aviso-foto" class="w-full" accept="image/png, image/jpeg, image/webp">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="aviso-solicitar-destaque" class="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
+                        <label for="aviso-solicitar-destaque" class="ml-2 block text-sm text-gray-900">Solicitar destaque no carrossel da página inicial</label>
                     </div>
                     
-                    <div id="request-feedback" class="h-10"></div>
-                    <button type="submit" id="request-submit-button" class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center">
-                        <span class="button-text">Enviar Pedido de Destaque</span>
+                    <div id="aviso-feedback" class="h-10"></div>
+                    <button type="submit" id="aviso-submit-button" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center">
+                        <span class="button-text">Publicar Aviso</span>
                         <div class="loading-spinner hidden"></div>
                     </button>
                 </form>
+
+                <!-- Lista de Avisos Atuais -->
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold">Avisos Publicados</h3>
+                    <div id="aviso-loading" class="text-gray-500 mt-2">Carregando avisos...</div>
+                    <div id="aviso-list" class="space-y-3 mt-4">
+                        <!-- Avisos da paróquia serão carregados aqui -->
+                    </div>
+                </div>
             `;
-            panel.appendChild(eventRequester);
+            panel.appendChild(eventManager);
 
             // Adiciona listeners para os formulários
             document.getElementById("admin-form").addEventListener("submit", handleParishSaveChanges);
-            document.getElementById("destaque-request-form").addEventListener("submit", handleDestaqueRequestSubmit);
+            document.getElementById("aviso-form").addEventListener("submit", handleAvisoSubmit);
+            
+            // Carrega os avisos da paróquia
+            loadParishAvisos(parishId);
+        }
+        
+        // Carrega a lista de avisos da paróquia no painel de admin
+        function loadParishAvisos(parishId) {
+            const listDiv = document.getElementById("aviso-list");
+            const loadingDiv = document.getElementById("aviso-loading");
+            const avisosColRef = collection(db, "parishes", parishId, "avisos");
+            const q = query(avisosColRef, orderBy("dataPublicacao", "desc"), limit(10));
+            
+            // Cancela o listener anterior (se houver) para evitar duplicatas
+            if (parishAvisosUnsubscribe) parishAvisosUnsubscribe();
+
+            parishAvisosUnsubscribe = onSnapshot(q, (snapshot) => {
+                listDiv.innerHTML = ""; // Limpa a lista
+                if (snapshot.empty) {
+                    loadingDiv.innerText = "Nenhum aviso publicado.";
+                    return;
+                }
+                loadingDiv.style.display = 'none';
+
+                snapshot.forEach(doc => {
+                    const aviso = { id: doc.id, ...doc.data() };
+                    const dataAv = aviso.dataPublicacao.toDate().toLocaleDateString('pt-BR');
+                    
+                    const card = document.createElement('div');
+                    card.className = "flex items-center gap-4 p-3 border rounded-lg";
+                    card.innerHTML = `
+                        ${aviso.imagemUrl ? `<img src="${aviso.imagemUrl}" class="w-16 h-16 object-cover rounded">` : '<div class="w-16 h-16 bg-gray-100 rounded flex items-center justify-center text-gray-400">Sem Foto</div>'}
+                        <div class="flex-1">
+                            <h4 class="font-semibold">${aviso.titulo}</h4>
+                            <p class="text-sm text-gray-600">${aviso.descricao.substring(0, 50)}...</p>
+                            <p class="text-xs text-gray-400">Publicado em: ${dataAv}</p>
+                            ${aviso.statusDestaque ? `<span class="text-xs font-medium ${aviso.statusDestaque === 'pendente' ? 'text-yellow-600' : 'text-green-600'}">Status Destaque: ${aviso.statusDestaque}</span>` : ''}
+                        </div>
+                        <button class="delete-aviso-button bg-red-100 text-red-700 px-2 py-1 rounded text-sm" data-id="${aviso.id}">Excluir</button>
+                    `;
+                    listDiv.appendChild(card);
+                });
+                
+                // Adiciona listener para os botões de deletar
+                document.querySelectorAll(".delete-aviso-button").forEach(btn => {
+                    btn.addEventListener('click', handleDeleteAviso);
+                });
+
+            }, (error) => {
+                console.error("Erro ao carregar avisos da paróquia:", error);
+                loadingDiv.innerText = "Erro ao carregar avisos.";
+            });
+        }
+        
+        // Função para Deletar um Aviso
+        async function handleDeleteAviso(e) {
+            const avisoId = e.target.dataset.id;
+            if (!confirm("Tem certeza que deseja excluir este aviso? Esta ação não pode ser desfeita.")) return;
+            
+            try {
+                const avisoDocRef = doc(db, "parishes", currentAdminParish.id, "avisos", avisoId);
+                await deleteDoc(avisoDocRef);
+                // O onSnapshot atualizará a lista
+            } catch (error) {
+                console.error("Erro ao excluir aviso:", error);
+                alert("Erro ao excluir aviso: " + error.message);
+            }
         }
 
-        // Função para Salvar as Mudanças da Paróquia
+        // Função para Salvar as Mudanças da Paróquia (Infos e Foto)
         async function handleParishSaveChanges(e) {
             e.preventDefault();
             
@@ -790,25 +887,15 @@
                         horarios: line.split(':').slice(1).join(':').trim()
                     }));
                 
-                const avisosText = document.getElementById("admin-avisos").value.trim();
-                const avisosArray = avisosText.split('\n')
-                    .filter(line => line.includes('|'))
-                    .map(line => {
-                        const parts = line.split('|');
-                        return {
-                            data: (parts[0] || 'Sem data').trim(),
-                            titulo: (parts[1] || 'Sem título').trim(),
-                            descricao: (parts[2] || 'Sem descrição').trim()
-                        };
-                    });
-
+                // O campo AVISOS não é mais salvo aqui, ele tem seu próprio sistema
+                
                 const dataToUpdate = {
                     paroco: document.getElementById("admin-paroco").value,
                     telefone: document.getElementById("admin-telefone").value,
                     email: document.getElementById("admin-email").value,
                     confissoes: document.getElementById("admin-confissoes").value,
                     missas: missasArray,
-                    avisos: avisosArray,
+                    // avisos: avisosArray, // REMOVIDO
                 };
 
                 if (newFotoUrl) {
@@ -838,17 +925,18 @@
             }
         }
         
-        // Função para Enviar Pedido de Destaque
-        async function handleDestaqueRequestSubmit(e) {
+        // Função para Enviar um Novo Aviso (e talvez solicitar destaque)
+        async function handleAvisoSubmit(e) {
             e.preventDefault();
             
-            const submitButton = document.getElementById("request-submit-button");
-            const feedbackDiv = document.getElementById("request-feedback");
-            const fileInput = document.getElementById("request-foto");
+            const submitButton = document.getElementById("aviso-submit-button");
+            const feedbackDiv = document.getElementById("aviso-feedback");
+            const fileInput = document.getElementById("aviso-foto");
             const file = fileInput.files[0];
+            const solicitarDestaque = document.getElementById("aviso-solicitar-destaque").checked;
 
-            if (!file) {
-                feedbackDiv.innerHTML = '<p class="text-red-600 font-semibold">Por favor, selecione uma imagem para o evento.</p>';
+            if (solicitarDestaque && !file) {
+                feedbackDiv.innerHTML = '<p class="text-red-600 font-semibold">Para solicitar destaque, é obrigatório anexar uma imagem.</p>';
                 return;
             }
 
@@ -856,37 +944,54 @@
             submitButton.querySelector('.button-text').classList.add('hidden');
             submitButton.querySelector('.loading-spinner').classList.remove('hidden');
             submitButton.disabled = true;
-            feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando imagem do evento...</p>';
-
+            feedbackDiv.innerHTML = '<p class="text-blue-600">Publicando aviso...</p>';
+            
             try {
-                // 1. Upload da imagem do evento
-                const imageUrl = await uploadImageToCloudinary(file);
-                console.log("Upload da imagem do evento concluído:", imageUrl);
+                let imageUrl = null;
                 
-                feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando solicitação...</p>';
+                // 1. Upload da imagem (se houver)
+                if (file) {
+                    feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando imagem do aviso...</p>';
+                    imageUrl = await uploadImageToCloudinary(file);
+                }
 
                 // 2. Preparar dados
-                const titulo = document.getElementById("request-titulo").value;
-                const dataString = document.getElementById("request-data").value;
-                const dataEvento = Timestamp.fromDate(new Date(dataString));
-
-                // 3. Salvar na coleção 'destaqueRequests'
-                await addDoc(collection(db, "destaqueRequests"), {
+                const titulo = document.getElementById("aviso-titulo").value;
+                const descricao = document.getElementById("aviso-descricao").value;
+                const dataPublicacao = Timestamp.now();
+                
+                const avisoData = {
                     titulo: titulo,
-                    subtitulo: currentAdminParish.nome, // Nome da paróquia logada
-                    parishId: currentAdminParish.id, // ID da paróquia logada
-                    dataEvento: dataEvento,
-                    imagemUrl: imageUrl,
-                    status: "pendente" // Status inicial
-                });
+                    descricao: descricao,
+                    dataPublicacao: dataPublicacao,
+                    imagemUrl: imageUrl, // Pode ser null
+                    statusDestaque: solicitarDestaque ? "pendente" : null
+                };
+
+                // 3. Salvar na subcoleção 'avisos' da paróquia
+                const avisoColRef = collection(db, "parishes", currentAdminParish.id, "avisos");
+                await addDoc(avisoColRef, avisoData);
+
+                // 4. Enviar para a fila de 'destaqueRequests' (se solicitado)
+                if (solicitarDestaque) {
+                    feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando pedido de destaque...</p>';
+                    await addDoc(collection(db, "destaqueRequests"), {
+                        titulo: titulo,
+                        subtitulo: currentAdminParish.nome, // Nome da paróquia logada
+                        parishId: currentAdminParish.id, // ID da paróquia logada
+                        dataEvento: dataPublicacao, // Usa a data de publicação como referência
+                        imagemUrl: imageUrl,
+                        status: "pendente" // Status inicial
+                    });
+                }
 
                 // Sucesso!
-                feedbackDiv.innerHTML = '<p class="text-green-600 font-semibold">Pedido de destaque enviado com sucesso!</p>';
-                document.getElementById("destaque-request-form").reset();
+                feedbackDiv.innerHTML = '<p class="text-green-600 font-semibold">Aviso publicado com sucesso!</p>';
+                document.getElementById("aviso-form").reset();
 
             } catch (error) {
-                console.error("Erro ao enviar pedido de destaque:", error);
-                feedbackDiv.innerHTML = `<p class="text-red-600 font-semibold">Erro ao enviar: ${error.message}</p>`;
+                console.error("Erro ao publicar aviso:", error);
+                feedbackDiv.innerHTML = `<p class="text-red-600 font-semibold">Erro ao publicar: ${error.message}</p>`;
             } finally {
                 // Restaurar o botão
                 submitButton.querySelector('.button-text').classList.remove('hidden');
@@ -897,7 +1002,7 @@
 
         // Função Genérica de Upload para o Cloudinary
         async function uploadImageToCloudinary(file) {
-            const CLOUDINARY_CLOUD_NAME = "dmmj5gpl";
+            const CLOUDINARY_CLOUD_NAME = "dmmj5gpl"; // CORRIGIDO (sem o 'i' extra)
             const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
             if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
@@ -1072,6 +1177,10 @@
         
         // Mostra o site público (ao deslogar)
         function showPublicSite() {
+            if (parishAvisosUnsubscribe) {
+                parishAvisosUnsubscribe(); // Desliga o listener de avisos ao sair
+                parishAvisosUnsubscribe = null;
+            }
             document.getElementById("public-site").style.display = 'block';
             document.getElementById("admin-panel").classList.add("hidden");
             document.getElementById("admin-panel").innerHTML = ""; // Limpa o painel
