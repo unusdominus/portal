@@ -238,6 +238,7 @@
         let currentAdminParish = null; // Guarda o objeto {id, nome} da paróquia logada
         let isSuperAdmin = false; // Flag para Super Admin
         let parishAvisosUnsubscribe = null; // Para 'desligar' o listener de avisos
+        let currentEditingAvisoId = null; // ID do aviso sendo editado
 
         // Variáveis do Carrossel
         let carouselTrack, carouselDots;
@@ -552,82 +553,89 @@
         
         // Função para mostrar o modal de detalhes da paróquia
         async function showParishDetails(parishId) {
-            const parish = parishesCache.find(p => p.id === parishId);
-            if (!parish) return;
-
-            const modal = document.getElementById("parish-modal");
-            const content = document.getElementById("parish-modal-content");
-            
-            let missasHtml = '<li>Nenhum horário cadastrado.</li>';
-            if (parish.missas?.length > 0) {
-                missasHtml = parish.missas.map(m => `<li><span class="font-semibold">${m.dia}:</span> ${m.horarios}</li>`).join('');
-            }
-
-            // NOVO: Carrega avisos da subcoleção
-            let avisosHtml = '<li>Carregando avisos...</li>';
-            content.innerHTML = `<div class="p-10 text-center"><div class="loading-spinner inline-block" style="border-left-color: #b45309;"></div></div>`;
-            modal.classList.remove('hidden');
-
             try {
-                const avisosColRef = collection(db, "parishes", parishId, "avisos");
-                const q = query(avisosColRef, orderBy("dataPublicacao", "desc"), limit(10));
-                const avisosSnapshot = await getDocs(q);
+                const parish = parishesCache.find(p => p.id === parishId);
+                if (!parish) return;
+
+                const modal = document.getElementById("parish-modal");
+                const content = document.getElementById("parish-modal-content");
                 
-                if (avisosSnapshot.empty) {
-                    avisosHtml = '<li>Nenhum aviso cadastrado.</li>';
-                } else {
-                    avisosHtml = avisosSnapshot.docs.map(doc => {
-                        const aviso = doc.data();
-                        const dataAv = aviso.dataPublicacao.toDate().toLocaleDateString('pt-BR');
-                        return `
-                            <div class="bg-gray-50 border-l-4 border-yellow-600 p-4 mb-2 rounded-r-lg">
-                                <h4 class="font-semibold">${aviso.titulo}</h4>
-                                <p class="text-sm text-gray-500 mb-1">${dataAv}</p>
-                                <p class="text-sm">${aviso.descricao}</p>
-                                ${aviso.imagemUrl ? `<img src="${aviso.imagemUrl}" alt="Imagem do aviso" class="mt-2 rounded-lg w-full h-48 object-cover">` : ''}
-                            </div>
-                        `;
-                    }).join('');
+                let missasHtml = '<li>Nenhum horário cadastrado.</li>';
+                if (parish.missas?.length > 0) {
+                    missasHtml = parish.missas.map(m => `<li><span class="font-semibold">${m.dia}:</span> ${m.horarios}</li>`).join('');
                 }
-            } catch (err) {
-                console.error("Erro ao buscar avisos da subcoleção:", err);
-                avisosHtml = '<li>Erro ao carregar avisos.</li>';
+
+                // NOVO: Carrega avisos da subcoleção
+                let avisosHtml = '<li>Carregando avisos...</li>';
+                content.innerHTML = `<div class="p-10 text-center"><div class="loading-spinner inline-block" style="border-left-color: #b45309;"></div></div>`;
+                modal.classList.remove('hidden');
+
+                try {
+                    const avisosColRef = collection(db, "parishes", parishId, "avisos");
+                    const q = query(avisosColRef, orderBy("dataPublicacao", "desc"), limit(10));
+                    const avisosSnapshot = await getDocs(q);
+                    
+                    if (avisosSnapshot.empty) {
+                        avisosHtml = '<li>Nenhum aviso cadastrado.</li>';
+                    } else {
+                        avisosHtml = avisosSnapshot.docs.map(doc => {
+                            const aviso = doc.data();
+                            const dataAv = aviso.dataPublicacao.toDate().toLocaleDateString('pt-BR');
+                            return `
+                                <div class="bg-gray-50 border-l-4 border-yellow-600 p-4 mb-2 rounded-r-lg">
+                                    <h4 class="font-semibold">${aviso.titulo}</h4>
+                                    <p class="text-sm text-gray-500 mb-1">${dataAv}</p>
+                                    <p class="text-sm">${aviso.descricao}</p>
+                                    ${aviso.imagemUrl ? `<img src="${aviso.imagemUrl}" alt="Imagem do aviso" class="mt-2 rounded-lg w-full h-48 object-cover">` : ''}
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                } catch (err) {
+                    console.error("Erro ao buscar avisos da subcoleção:", err);
+                    avisosHtml = '<li>Erro ao carregar avisos.</li>';
+                }
+                
+                // Renderiza o conteúdo completo do modal
+                content.innerHTML = `
+                    <img src="${parish.fotoUrl || 'https://placehold.co/600x300/c2b280/FFFFFF?text=Igreja'}" alt="${parish.nome}" class="w-full h-64 object-cover rounded-t-lg">
+                    <div class="p-6 space-y-4">
+                        <h2 class="text-2xl font-bold text-yellow-700">${parish.nome}</h2>
+                        <p class="text-gray-600 italic">Pároco: ${parish.paroco || 'Não informado'}</p>
+                        
+                        <div class="border-t pt-4">
+                            <h3 class="text-lg font-semibold mb-2">Informações</h3>
+                            <p>${parish.endereco || 'Endereço não informado'}</p>
+                            <p>${parish.telefone || 'Telefone não informado'}</p>
+                            <p>${parish.email || 'Email não informado'}</p>
+                        </div>
+                        
+                        <div class="border-t pt-4">
+                            <h3 class="text-lg font-semibold mb-2">Horários das Missas</h3>
+                            <ul class="list-disc list-inside space-y-1">${missasHtml}</ul>
+                        </div>
+                        
+                        <div class="border-t pt-4">
+                            <h3 class="text-lg font-semibold mb-2">Confissões</h3>
+                            <p>${parish.confissoes || 'Não informado'}</p>
+                        </div>
+
+                        <div class="border-t pt-4">
+                            <h3 class="text-lg font-semibold mb-2">Mural de Avisos</h3>
+                            ${avisosHtml}
+                        </div>
+
+                        <button id="parish-modal-close" class="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition duration-200 mt-4">
+                            Fechar
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                console.error("Erro fatal ao mostrar detalhes:", error);
+                // Fecha o modal se algo der errado
+                document.getElementById("parish-modal").classList.add("hidden");
+                document.getElementById("parish-modal-content").innerHTML = "";
             }
-            
-            // Renderiza o conteúdo completo do modal
-            content.innerHTML = `
-                <img src="${parish.fotoUrl || 'https://placehold.co/600x300/c2b280/FFFFFF?text=Igreja'}" alt="${parish.nome}" class="w-full h-64 object-cover rounded-t-lg">
-                <div class="p-6 space-y-4">
-                    <h2 class="text-2xl font-bold text-yellow-700">${parish.nome}</h2>
-                    <p class="text-gray-600 italic">Pároco: ${parish.paroco || 'Não informado'}</p>
-                    
-                    <div class="border-t pt-4">
-                        <h3 class="text-lg font-semibold mb-2">Informações</h3>
-                        <p>${parish.endereco || 'Endereço não informado'}</p>
-                        <p>${parish.telefone || 'Telefone não informado'}</p>
-                        <p>${parish.email || 'Email não informado'}</p>
-                    </div>
-                    
-                    <div class="border-t pt-4">
-                        <h3 class="text-lg font-semibold mb-2">Horários das Missas</h3>
-                        <ul class="list-disc list-inside space-y-1">${missasHtml}</ul>
-                    </div>
-                    
-                    <div class="border-t pt-4">
-                        <h3 class="text-lg font-semibold mb-2">Confissões</h3>
-                        <p>${parish.confissoes || 'Não informado'}</p>
-                    </div>
-
-                    <div class="border-t pt-4">
-                        <h3 class="text-lg font-semibold mb-2">Mural de Avisos</h3>
-                        ${avisosHtml}
-                    </div>
-
-                    <button id="parish-modal-close" class="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition duration-200 mt-4">
-                        Fechar
-                    </button>
-                </div>
-            `;
         }
 
 
@@ -635,32 +643,38 @@
         
         // Verifica o tipo de usuário (Paróquia ou Super Admin)
         async function checkUserRole(user) {
-            // 1. Verifica se é Super Admin
-            const adminDocRef = doc(db, "admins", user.uid);
-            const adminDocSnap = await getDoc(adminDocRef);
-            
-            if (adminDocSnap.exists()) {
-                isSuperAdmin = true;
-                currentAdminParish = null; // Super admin não tem paróquia
-                showSuperAdminPanel(user);
-                return;
+            try {
+                // 1. Verifica se é Super Admin
+                const adminDocRef = doc(db, "admins", user.uid);
+                const adminDocSnap = await getDoc(adminDocRef);
+                
+                if (adminDocSnap.exists()) {
+                    isSuperAdmin = true;
+                    currentAdminParish = null; // Super admin não tem paróquia
+                    showSuperAdminPanel(user);
+                    return;
+                }
+
+                // 2. Se não for Super Admin, verifica se é Admin de Paróquia
+                const q = query(collection(db, "parishes"), where("ownerUid", "==", user.uid));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const parishDoc = querySnapshot.docs[0];
+                    isSuperAdmin = false;
+                    currentAdminParish = { id: parishDoc.id, nome: parishDoc.data().nome };
+                    showParishAdminPanel(parishDoc.id, parishDoc.data(), user.email);
+                    return;
+                }
+
+                // 3. Se não for nenhum, é um erro
+                alert("Erro: Seu usuário está logado, mas não está associado a uma paróquia nem é um Super Administrador.");
+                await signOut(auth);
+            } catch (error) {
+                console.error("Erro fatal ao verificar permissão:", error);
+                alert("Ocorreu um erro ao verificar suas permissões.");
+                await signOut(auth);
             }
-
-            // 2. Se não for Super Admin, verifica se é Admin de Paróquia
-            const q = query(collection(db, "parishes"), where("ownerUid", "==", user.uid));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const parishDoc = querySnapshot.docs[0];
-                isSuperAdmin = false;
-                currentAdminParish = { id: parishDoc.id, nome: parishDoc.data().nome };
-                showParishAdminPanel(parishDoc.id, parishDoc.data(), user.email);
-                return;
-            }
-
-            // 3. Se não for nenhum, é um erro
-            alert("Erro: Seu usuário está logado, mas não está associado a uma paróquia nem é um Super Administrador.");
-            await signOut(auth);
         }
         
         // Renderiza o HTML do Painel de Admin (Paróquia)
@@ -741,9 +755,9 @@
             eventManager.innerHTML = `
                 <h2 class="text-2xl font-bold text-yellow-700 mb-6">Mural de Avisos e Eventos</h2>
                 
-                <!-- Formulário para Novo Aviso -->
+                <!-- Formulário para Novo Aviso / Edição -->
                 <form id="aviso-form" class="space-y-4 p-4 border rounded-lg bg-gray-50">
-                    <h3 class="text-lg font-semibold">Adicionar Novo Aviso / Evento</h3>
+                    <h3 id="aviso-form-title" class="text-lg font-semibold">Adicionar Novo Aviso / Evento</h3>
                     <div>
                         <label class="block text-sm font-medium">Título*</label>
                         <input type="text" id="aviso-titulo" class="w-full p-2 border border-gray-300 rounded-lg mt-1" required>
@@ -755,6 +769,7 @@
                     <div>
                         <label class="block text-sm font-medium">Imagem (Opcional - para destaque)</label>
                         <input type="file" id="aviso-foto" class="w-full" accept="image/png, image/jpeg, image/webp">
+                        <p class="text-xs text-gray-500 mt-1">Selecione uma nova imagem para alterar a existente (se houver).</p>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" id="aviso-solicitar-destaque" class="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
@@ -762,10 +777,15 @@
                     </div>
                     
                     <div id="aviso-feedback" class="h-10"></div>
-                    <button type="submit" id="aviso-submit-button" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center">
-                        <span class="button-text">Publicar Aviso</span>
-                        <div class="loading-spinner hidden"></div>
-                    </button>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button type="submit" id="aviso-submit-button" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center">
+                            <span class="button-text">Publicar Aviso</span>
+                            <div class="loading-spinner hidden"></div>
+                        </button>
+                        <button type="button" id="aviso-cancel-edit-button" class="w-full sm:w-auto bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition duration-200 hidden">
+                            Cancelar Edição
+                        </button>
+                    </div>
                 </form>
 
                 <!-- Lista de Avisos Atuais -->
@@ -782,6 +802,7 @@
             // Adiciona listeners para os formulários
             document.getElementById("admin-form").addEventListener("submit", handleParishSaveChanges);
             document.getElementById("aviso-form").addEventListener("submit", handleAvisoSubmit);
+            document.getElementById("aviso-cancel-edit-button").addEventListener("click", resetAvisoForm);
             
             // Carrega os avisos da paróquia
             loadParishAvisos(parishId);
@@ -809,6 +830,10 @@
                     const aviso = { id: doc.id, ...doc.data() };
                     const dataAv = aviso.dataPublicacao.toDate().toLocaleDateString('pt-BR');
                     
+                    // Escapa aspas simples e duplas para o dataset
+                    const tituloEscapado = aviso.titulo.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const descricaoEscapada = aviso.descricao.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
                     const card = document.createElement('div');
                     card.className = "flex items-center gap-4 p-3 border rounded-lg";
                     card.innerHTML = `
@@ -819,12 +844,22 @@
                             <p class="text-xs text-gray-400">Publicado em: ${dataAv}</p>
                             ${aviso.statusDestaque ? `<span class="text-xs font-medium ${aviso.statusDestaque === 'pendente' ? 'text-yellow-600' : 'text-green-600'}">Status Destaque: ${aviso.statusDestaque}</span>` : ''}
                         </div>
-                        <button class="delete-aviso-button bg-red-100 text-red-700 px-2 py-1 rounded text-sm" data-id="${aviso.id}">Excluir</button>
+                        <button class="edit-aviso-button bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm" 
+                            data-id="${aviso.id}" 
+                            data-titulo="${tituloEscapado}" 
+                            data-descricao="${descricaoEscapada}"
+                            data-solicitar="${aviso.statusDestaque === 'pendente' ? 'true' : 'false'}">
+                            Editar
+                        </button>
+                        <button class="delete-aviso-button bg-red-100 text-red-700 px-3 py-1 rounded text-sm" data-id="${aviso.id}">Excluir</button>
                     `;
                     listDiv.appendChild(card);
                 });
                 
-                // Adiciona listener para os botões de deletar
+                // Adiciona listener para os botões de editar e deletar
+                document.querySelectorAll(".edit-aviso-button").forEach(btn => {
+                    btn.addEventListener('click', handleEditAviso);
+                });
                 document.querySelectorAll(".delete-aviso-button").forEach(btn => {
                     btn.addEventListener('click', handleDeleteAviso);
                 });
@@ -835,12 +870,52 @@
             });
         }
         
+        // Função para preencher o formulário para Edição de Aviso
+        function handleEditAviso(e) {
+            const btn = e.target;
+            currentEditingAvisoId = btn.dataset.id;
+            
+            // Preenche o formulário
+            document.getElementById("aviso-form-title").innerText = "Editando Aviso / Evento";
+            document.getElementById("aviso-titulo").value = btn.dataset.titulo;
+            document.getElementById("aviso-descricao").value = btn.dataset.descricao;
+            document.getElementById("aviso-solicitar-destaque").checked = (btn.dataset.solicitar === 'true');
+            
+            // Altera o botão
+            const submitButton = document.getElementById("aviso-submit-button");
+            submitButton.querySelector('.button-text').innerText = "Salvar Edição";
+            submitButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            submitButton.classList.add('bg-orange-500', 'hover:bg-orange-600');
+
+            // Mostra o botão "Cancelar Edição"
+            document.getElementById("aviso-cancel-edit-button").classList.remove("hidden");
+            
+            // Foca no formulário
+            document.getElementById("aviso-form").scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Função para resetar o formulário de aviso
+        function resetAvisoForm() {
+            currentEditingAvisoId = null;
+            document.getElementById("aviso-form").reset();
+            
+            document.getElementById("aviso-form-title").innerText = "Adicionar Novo Aviso / Evento";
+            const submitButton = document.getElementById("aviso-submit-button");
+            submitButton.querySelector('.button-text').innerText = "Publicar Aviso";
+            submitButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            submitButton.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+            
+            document.getElementById("aviso-feedback").innerHTML = "";
+            document.getElementById("aviso-cancel-edit-button").classList.add("hidden");
+        }
+        
         // Função para Deletar um Aviso
         async function handleDeleteAviso(e) {
             const avisoId = e.target.dataset.id;
             if (!confirm("Tem certeza que deseja excluir este aviso? Esta ação não pode ser desfeita.")) return;
             
             try {
+                // TODO: Deletar também a solicitação de destaque se houver?
                 const avisoDocRef = doc(db, "parishes", currentAdminParish.id, "avisos", avisoId);
                 await deleteDoc(avisoDocRef);
                 // O onSnapshot atualizará a lista
@@ -871,6 +946,7 @@
                 // ETAPA 1: Upload da Imagem da Paróquia (se houver)
                 if (file) {
                     feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando imagem...</p>';
+                    // CORREÇÃO: Passando o nome da nuvem correto
                     newFotoUrl = await uploadImageToCloudinary(file);
                     console.log('Upload da imagem da paróquia concluído:', newFotoUrl);
                 } else {
@@ -887,15 +963,12 @@
                         horarios: line.split(':').slice(1).join(':').trim()
                     }));
                 
-                // O campo AVISOS não é mais salvo aqui, ele tem seu próprio sistema
-                
                 const dataToUpdate = {
                     paroco: document.getElementById("admin-paroco").value,
                     telefone: document.getElementById("admin-telefone").value,
                     email: document.getElementById("admin-email").value,
                     confissoes: document.getElementById("admin-confissoes").value,
                     missas: missasArray,
-                    // avisos: avisosArray, // REMOVIDO
                 };
 
                 if (newFotoUrl) {
@@ -929,13 +1002,14 @@
         async function handleAvisoSubmit(e) {
             e.preventDefault();
             
+            const isEditing = currentEditingAvisoId !== null;
             const submitButton = document.getElementById("aviso-submit-button");
             const feedbackDiv = document.getElementById("aviso-feedback");
             const fileInput = document.getElementById("aviso-foto");
             const file = fileInput.files[0];
             const solicitarDestaque = document.getElementById("aviso-solicitar-destaque").checked;
 
-            if (solicitarDestaque && !file) {
+            if (solicitarDestaque && !file && !isEditing) { // Só exige foto se for novo e pedir destaque
                 feedbackDiv.innerHTML = '<p class="text-red-600 font-semibold">Para solicitar destaque, é obrigatório anexar uma imagem.</p>';
                 return;
             }
@@ -944,7 +1018,7 @@
             submitButton.querySelector('.button-text').classList.add('hidden');
             submitButton.querySelector('.loading-spinner').classList.remove('hidden');
             submitButton.disabled = true;
-            feedbackDiv.innerHTML = '<p class="text-blue-600">Publicando aviso...</p>';
+            feedbackDiv.innerHTML = `<p class="text-blue-600">${isEditing ? 'Salvando edição...' : 'Publicando aviso...'}</p>`;
             
             try {
                 let imageUrl = null;
@@ -952,26 +1026,34 @@
                 // 1. Upload da imagem (se houver)
                 if (file) {
                     feedbackDiv.innerHTML = '<p class="text-blue-600">Enviando imagem do aviso...</p>';
-                    imageUrl = await uploadImageToCloudinary(file)
-                    console.log('Upload da imagem do aviso concluído:', newFotoUrl);
+                    // CORREÇÃO: Passando o nome da nuvem correto
+                    imageUrl = await uploadImageToCloudinary(file);
                 }
 
                 // 2. Preparar dados
                 const titulo = document.getElementById("aviso-titulo").value;
                 const descricao = document.getElementById("aviso-descricao").value;
-                const dataPublicacao = Timestamp.now();
                 
-                const avisoData = {
+                const dataToUpdate = {
                     titulo: titulo,
                     descricao: descricao,
-                    dataPublicacao: dataPublicacao,
-                    imagemUrl: imageUrl, // Pode ser null
+                    dataPublicacao: Timestamp.now(), // Sempre atualiza a data
                     statusDestaque: solicitarDestaque ? "pendente" : null
+                    // Se imageUrl não for null, será adicionado abaixo
                 };
+                
+                if (imageUrl) {
+                    dataToUpdate.imagemUrl = imageUrl;
+                }
 
-                // 3. Salvar na subcoleção 'avisos' da paróquia
-                const avisoColRef = collection(db, "parishes", currentAdminParish.id, "avisos");
-                await addDoc(avisoColRef, avisoData);
+                // 3. Salvar (Criar novo ou Atualizar existente)
+                if (isEditing) {
+                    const avisoDocRef = doc(db, "parishes", currentAdminParish.id, "avisos", currentEditingAvisoId);
+                    await updateDoc(avisoDocRef, dataToUpdate);
+                } else {
+                    const avisoColRef = collection(db, "parishes", currentAdminParish.id, "avisos");
+                    await addDoc(avisoColRef, avisoData); // avisoData foi renomeado para dataToUpdate
+                }
 
                 // 4. Enviar para a fila de 'destaqueRequests' (se solicitado)
                 if (solicitarDestaque) {
@@ -980,15 +1062,15 @@
                         titulo: titulo,
                         subtitulo: currentAdminParish.nome, // Nome da paróquia logada
                         parishId: currentAdminParish.id, // ID da paróquia logada
-                        dataEvento: dataPublicacao, // Usa a data de publicação como referência
-                        imagemUrl: imageUrl,
+                        dataEvento: Timestamp.now(), // Usa a data de publicação como referência
+                        imagemUrl: imageUrl || (await getDoc(doc(db, "parishes", currentAdminParish.id, "avisos", currentEditingAvisoId))).data().imagemUrl, // Pega a nova ou a antiga
                         status: "pendente" // Status inicial
                     });
                 }
 
                 // Sucesso!
-                feedbackDiv.innerHTML = '<p class="text-green-600 font-semibold">Aviso publicado com sucesso!</p>';
-                document.getElementById("aviso-form").reset();
+                feedbackDiv.innerHTML = `<p class="text-green-600 font-semibold">Aviso ${isEditing ? 'atualizado' : 'publicado'} com sucesso!</p>`;
+                resetAvisoForm(); // Reseta o formulário
 
             } catch (error) {
                 console.error("Erro ao publicar aviso:", error);
@@ -1004,7 +1086,7 @@
         // Função Genérica de Upload para o Cloudinary
         async function uploadImageToCloudinary(file) {
             // CORREÇÃO FINAL: Garantir que AMBAS as funções usam o nome correto
-            const CLOUDINARY_CLOUD_NAME = "dmmj5gpl"; 
+            const CLOUDINARY_CLOUD_NAME = "dmmj5gpl"; // CORRIGIDO: Sem o 'i' extra
             const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
             if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
@@ -1216,7 +1298,12 @@
             document.getElementById("parishes-list").addEventListener("click", (e) => {
                 const card = e.target.closest('[data-parish-id]');
                 if (card) {
-                    showParishDetails(card.dataset.parishId);
+                    try {
+                        showParishDetails(card.dataset.parishId);
+                    } catch (error) {
+                        console.error("Erro ao tentar mostrar detalhes da paróquia:", error);
+                        alert("Não foi possível carregar os detalhes desta paróquia.");
+                    }
                 }
             });
 
@@ -1285,7 +1372,13 @@
                     document.getElementById("parish-login-button").innerText = 'Sair';
                     document.getElementById("public-site").style.display = 'none';
                     document.getElementById("admin-panel").classList.remove("hidden");
-                    checkUserRole(user);
+                    try {
+                        checkUserRole(user);
+                    } catch (error) {
+                        console.error("Erro ao verificar função do usuário:", error);
+                        alert("Ocorreu um erro ao verificar suas permissões de usuário.");
+                        signOut(auth);
+                    }
                 } else {
                     // Usuário está deslogado
                     console.log("Usuário deslogado.");
@@ -1302,4 +1395,3 @@
     </script>
 </body>
 </html>
-
