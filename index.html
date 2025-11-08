@@ -24,6 +24,40 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* Estilos do Carrossel */
+        .carousel-container {
+            position: relative;
+            overflow: hidden;
+        }
+        .carousel-track {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+        }
+        .carousel-slide {
+            flex: 0 0 100%;
+            min-width: 100%;
+            position: relative;
+        }
+        .carousel-dots {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+        .carousel-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .carousel-dot.active {
+            background-color: rgba(255, 255, 255, 1);
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -45,31 +79,41 @@
         <!-- 2. CONTEÚDO PRINCIPAL (SITE PÚBLICO) -->
         <main id="public-site" class="space-y-6">
 
-            <!-- 2.1. DESTAQUE PRINCIPAL E MURAL DIOCESANO -->
+            <!-- 2.1. CARROSSEL DE DESTAQUES E MURAL DIOCESANO -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Destaque Principal (2/3) -->
+                
+                <!-- Novo Carrossel de Destaques (2/3) -->
                 <div id="destaque-loading" class="md:col-span-2 bg-white shadow-lg rounded-lg p-6 animate-pulse h-96 flex items-center justify-center">Carregando destaques...</div>
-                <div id="destaque-content" class="md:col-span-2 bg-white shadow-lg rounded-lg overflow-hidden hidden">
-                    <!-- Conteúdo será preenchido pelo JavaScript -->
+                <div id="destaque-carousel-container" class="md:col-span-2 bg-gray-900 shadow-lg rounded-lg overflow-hidden hidden h-96 carousel-container">
+                    
+                    <div id="carousel-track" class="carousel-track h-full">
+                        <!-- Slides serão preenchidos pelo JavaScript -->
+                    </div>
+
+                    <!-- Navegação (Bolinhas) -->
+                    <div id="carousel-dots" class="carousel-dots">
+                        <!-- Bolinhas serão preenchidas pelo JavaScript -->
+                    </div>
+
                 </div>
 
                 <!-- Mural Diocesano (1/3) -->
                 <div id="mural-loading" class="bg-white shadow-lg rounded-lg p-6 animate-pulse h-96 flex items-center justify-center">Carregando mural...</div>
-                <div id="mural-content" class="bg-white shadow-lg rounded-lg overflow-hidden hidden">
-                    <div class="p-6">
+                <div id="mural-content" class="bg-white shadow-lg rounded-lg overflow-hidden hidden h-96">
+                    <div class="p-6 h-full flex flex-col">
                         <h2 class="text-2xl font-bold text-yellow-700 mb-4">Mural Diocesano</h2>
                         <!-- Abas do Mural -->
                         <div class="border-b border-gray-200">
                             <nav class="-mb-px flex space-x-4" aria-label="Tabs">
-                                <button class="tab-button active" data-tab="liturgia">Liturgia</button>
+                                <button class="tab-button" data-tab="liturgia">Liturgia</button>
                                 <button class="tab-button" data-tab="santo">Santo do Dia</button>
                                 <button class="tab-button" data-tab="eventos">Eventos</button>
                             </nav>
                         </div>
                         <!-- Conteúdo das Abas -->
-                        <div id="mural-tabs-content" class="mt-4">
+                        <div id="mural-tabs-content" class="mt-4 flex-1 overflow-y-auto">
                             <!-- Liturgia -->
-                            <div id="tab-liturgia" class="tab-content active space-y-2">
+                            <div id="tab-liturgia" class="tab-content space-y-2">
                                 <!-- Conteúdo preenchido pelo JavaScript -->
                             </div>
                             <!-- Santo do Dia -->
@@ -170,14 +214,13 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
             getFirestore, collection, doc, getDoc, getDocs, onSnapshot,
-            query, where, updateDoc
+            query, where, updateDoc, orderBy, limit
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
         import { 
             getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut 
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
         // --- 3. CONFIGURAÇÃO DO FIREBASE ---
-        // ATENÇÃO: SUBSTITUA COM AS SUAS CHAVES REAIS DO FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyCN8Wm-XqTkD4tcjlF-tTusRO92JA0c0Y0",
             authDomain: "unusdominus.firebaseapp.com",
@@ -194,11 +237,22 @@
         let parishesCache = []; // Cache local para busca rápida
         let currentAdminParishId = null; // ID da paróquia que o admin está editando
 
+        // Variáveis do Carrossel
+        let carouselTrack, carouselDots;
+        let slides = [];
+        let currentSlide = 0;
+        let carouselInterval = null; // Para o auto-play
+
         try {
             app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
             console.log("Firebase inicializado com sucesso!");
+            
+            // CORREÇÃO PARA O SCRIPT ERROR:
+            // Só inicializa a aplicação e os listeners DEPOIS que o Firebase carregar.
+            initializeAppListeners();
+
         } catch (error) {
             console.error("Erro ao inicializar o Firebase:", error);
             document.body.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded m-4" role="alert">
@@ -210,33 +264,147 @@
 
         // --- 5. LÓGICA DO SITE PÚBLICO ---
 
-        // Função para carregar o conteúdo global (Destaque, Mural, etc.)
+        // Função para carregar o conteúdo global (Carrossel e Mural)
         async function loadGlobalContent() {
+            // Carrega o Mural (globalContent/main)
+            loadMural();
+            // Carrega o Carrossel (coleção 'destaques')
+            loadCarousel();
+        }
+
+        // Função para carregar o Carrossel
+        async function loadCarousel() {
             try {
+                const destaquesCol = collection(db, "destaques");
+                // Ordena por data (mais recentes primeiro) e limita a 10
+                const q = query(destaquesCol, orderBy("dataEvento", "desc"), limit(10));
+
+                onSnapshot(q, (snapshot) => {
+                    if (carouselInterval) clearInterval(carouselInterval); // Para o auto-play
+
+                    const track = document.getElementById("carousel-track");
+                    const dotsContainer = document.getElementById("carousel-dots");
+                    
+                    track.innerHTML = '';
+                    dotsContainer.innerHTML = '';
+                    slides = [];
+                    currentSlide = 0;
+
+                    if (snapshot.empty) {
+                        document.getElementById("destaque-loading").innerText = "Nenhum evento em destaque no momento.";
+                        return;
+                    }
+
+                    snapshot.forEach((doc, index) => {
+                        const data = doc.data();
+                        slides.push(data);
+
+                        // Cria o Slide
+                        const slide = document.createElement('a');
+                        slide.href = data.link || '#';
+                        slide.target = data.link ? '_blank' : '_self';
+                        slide.className = 'carousel-slide';
+                        slide.innerHTML = `
+                            <img src="${data.imagemUrl || 'https://placehold.co/800x400/c2b280/FFFFFF?text=Evento'}" alt="${data.titulo}" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+                            <div class="absolute bottom-0 left-0 p-6 md:p-8 text-white">
+                                <h3 class="text-2xl md:text-3xl font-bold">${data.titulo}</h3>
+                                <p class="text-lg md:text-xl">${data.subtitulo}</p>
+                            </div>
+                        `;
+                        track.appendChild(slide);
+
+                        // Cria a Bolinha (Dot)
+                        const dot = document.createElement('button');
+                        dot.className = 'carousel-dot';
+                        dot.dataset.slide = index;
+                        if (index === 0) dot.classList.add('active');
+                        dotsContainer.appendChild(dot);
+                    });
+                    
+                    if (slides.length <= 1) {
+                        dotsContainer.style.display = 'none'; // Esconde bolinhas se for só 1 slide
+                    }
+
+                    // Seleciona os elementos criados
+                    carouselTrack = document.getElementById("carousel-track");
+                    carouselDots = document.getElementById("carousel-dots");
+
+                    // Adiciona listeners de clique nas bolinhas
+                    carouselDots.addEventListener('click', (e) => {
+                        const targetDot = e.target.closest('button');
+                        if (!targetDot) return;
+                        
+                        const slideIndex = parseInt(targetDot.dataset.slide);
+                        goToSlide(slideIndex);
+                        
+                        // Reinicia o timer do auto-play
+                        if (carouselInterval) clearInterval(carouselInterval);
+                        carouselInterval = setInterval(nextSlide, 5000);
+                    });
+                    
+                    // Inicia o carrossel
+                    updateSlidePosition();
+                    document.getElementById("destaque-loading").style.display = 'none';
+                    document.getElementById("destaque-carousel-container").classList.remove("hidden");
+
+                    // Inicia auto-play se tiver mais de 1 slide
+                    if (slides.length > 1) {
+                         carouselInterval = setInterval(nextSlide, 5000); // Muda a cada 5 segundos
+                    }
+
+                }, (error) => {
+                     console.error("Erro ao carregar destaques do Firestore: ", error);
+                     document.getElementById("destaque-loading").innerText = "Erro ao carregar destaques.";
+                });
+
+            } catch (error) {
+                console.error("Erro ao carregar carrossel:", error);
+            }
+        }
+
+        // Funções de controle do Carrossel
+        function goToSlide(slideIndex) {
+            currentSlide = slideIndex;
+            updateSlidePosition();
+            updateDots();
+        }
+
+        function nextSlide() {
+            const newIndex = (currentSlide + 1) % slides.length;
+            goToSlide(newIndex);
+        }
+
+        function updateSlidePosition() {
+            if (carouselTrack) {
+                carouselTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
+            }
+        }
+
+        function updateDots() {
+            if (carouselDots) {
+                Array.from(carouselDots.children).forEach((dot, index) => {
+                    dot.classList.toggle('active', index === currentSlide);
+                });
+            }
+        }
+
+        // Função para carregar o Mural Diocesano
+        async function loadMural() {
+             try {
                 const docRef = doc(db, "globalContent", "main");
                 
-                // Usar onSnapshot para ouvir mudanças em tempo real (atualiza o site sem refresh)
                 onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         
-                        // Renderiza Destaque
-                        const destaqueContainer = document.getElementById("destaque-content");
-                        if (data?.destaquePrincipal) {
-                            destaqueContainer.innerHTML = `
-                                <img src="${data.destaquePrincipal.imagemUrl || 'https://placehold.co/800x400/c2b280/FFFFFF?text=Destaque'}" alt="${data.destaquePrincipal.titulo}" class="w-full h-64 object-cover">
-                                <div class="p-6">
-                                    <h3 class="text-xl font-bold mb-2">${data.destaquePrincipal.titulo}</h3>
-                                    <p class="text-gray-600">${data.destaquePrincipal.descricao}</p>
-                                </div>
-                            `;
-                            document.getElementById("destaque-loading").style.display = 'none';
-                            destaqueContainer.classList.remove("hidden");
-                        }
-                        
                         // Renderiza Mural
                         const muralContainer = document.getElementById("mural-content");
                         
+                        // Define a aba ativa inicial
+                        document.querySelector('.tab-button[data-tab="liturgia"]').classList.add('active');
+                        document.getElementById('tab-liturgia').classList.add('active');
+
                         // Liturgia
                         if (data?.liturgiaDiaria) {
                             const liturgia = data.liturgiaDiaria;
@@ -290,12 +458,10 @@
 
                     } else {
                         console.log("Documento global 'main' não encontrado!");
-                        document.getElementById("destaque-loading").innerText = "Conteúdo não encontrado.";
-                        document.getElementById("mural-loading").innerText = "Conteúdo não encontrado.";
+                        document.getElementById("mural-loading").innerText = "Conteúdo do mural não encontrado.";
                     }
                 }, (error) => {
                      console.error("Erro ao carregar dados globais do Firestore: ", error);
-                     // Se o erro for de permissão, o F12 mostrará
                 });
             } catch (error) {
                 console.error("Erro ao carregar conteúdo global:", error);
@@ -437,68 +603,6 @@
 
         // --- 6. LÓGICA DE AUTENTICAÇÃO E PAINEL ADMIN ---
         
-        // Monitora o estado de autenticação
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // Usuário está logado
-                console.log("Usuário logado:", user.uid);
-                showAdminPanel(user);
-            } else {
-                // Usuário está deslogado
-                console.log("Usuário deslogado.");
-                showPublicSite();
-            }
-        });
-
-        // Mostra o Modal de Login
-        document.getElementById("parish-login-button").addEventListener("click", () => {
-             // Se o usuário estiver logado, o botão agora é de "Sair"
-            if (auth.currentUser) {
-                if (confirm("Tem certeza que deseja sair do painel?")) {
-                    signOut(auth);
-                }
-            } else {
-                // Se estiver deslogado, abre o modal de login
-                document.getElementById("login-modal").classList.remove("hidden");
-            }
-        });
-
-        // Cancela o Login
-        document.getElementById("login-cancel-button").addEventListener("click", () => {
-            document.getElementById("login-modal").classList.add("hidden");
-            document.getElementById("login-error").classList.add("hidden");
-            document.getElementById("login-form").reset();
-        });
-
-        // Processa o formulário de login
-        document.getElementById("login-form").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const email = document.getElementById("login-email").value;
-            const password = document.getElementById("login-password").value;
-            const errorDiv = document.getElementById("login-error");
-            const submitButton = document.getElementById("login-submit-button");
-
-            submitButton.querySelector('.button-text').classList.add('hidden');
-            submitButton.querySelector('.loading-spinner').classList.remove('hidden');
-            submitButton.disabled = true;
-
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                // Sucesso! O onAuthStateChanged vai ser disparado
-                document.getElementById("login-modal").classList.add("hidden");
-                errorDiv.classList.add("hidden");
-                document.getElementById("login-form").reset();
-            } catch (error) {
-                console.error("Erro de login:", error.code);
-                errorDiv.innerText = "Email ou senha inválidos. Tente novamente.";
-                errorDiv.classList.remove("hidden");
-            } finally {
-                submitButton.querySelector('.button-text').classList.remove('hidden');
-                submitButton.querySelector('.loading-spinner').classList.add('hidden');
-                submitButton.disabled = false;
-            }
-        });
-
         // Mostra o Painel de Admin para o usuário logado
         async function showAdminPanel(user) {
             try {
@@ -756,46 +860,106 @@
         }
 
         // --- 7. EVENT LISTENERS (Gatilhos de Interação) ---
+        // CORREÇÃO PARA "Script error": Agrupa todos os listeners numa função
+        function initializeAppListeners() {
+            // Listener da barra de busca
+            document.getElementById("search-input").addEventListener("keyup", filterParishes);
 
-        // Listener da barra de busca
-        document.getElementById("search-input").addEventListener("keyup", filterParishes);
+            // Listener de clique nas abas do Mural
+            document.querySelectorAll(".tab-button").forEach(button => {
+                button.addEventListener("click", () => {
+                    const tabId = button.dataset.tab;
+                    
+                    // Remove 'active' de todos
+                    document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
+                    document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
 
-        // Listener de clique nas abas do Mural
-        document.querySelectorAll(".tab-button").forEach(button => {
-            button.addEventListener("click", () => {
-                const tabId = button.dataset.tab;
-                
-                // Remove 'active' de todos
-                document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
-                document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
-
-                // Adiciona 'active' ao clicado
-                button.classList.add("active");
-                document.getElementById(`tab-${tabId}`).classList.add("active");
+                    // Adiciona 'active' ao clicado
+                    button.classList.add("active");
+                    document.getElementById(`tab-${tabId}`).classList.add("active");
+                });
             });
-        });
 
-        // Listener para abrir o modal de detalhes (clicando no card da paróquia)
-        document.getElementById("parishes-list").addEventListener("click", (e) => {
-            const card = e.target.closest('[data-parish-id]');
-            if (card) {
-                showParishDetails(card.dataset.parishId);
-            }
-        });
+            // Listener para abrir o modal de detalhes (clicando no card da paróquia)
+            document.getElementById("parishes-list").addEventListener("click", (e) => {
+                const card = e.target.closest('[data-parish-id]');
+                if (card) {
+                    showParishDetails(card.dataset.parishId);
+                }
+            });
 
-        // Listener para fechar o modal de detalhes
-        document.getElementById("parish-modal").addEventListener("click", (e) => {
-            // Fecha se clicar no fundo ou no botão "Fechar"
-            if (e.target.id === "parish-modal" || e.target.id === "parish-modal-close") {
-                document.getElementById("parish-modal").classList.add("hidden");
-                document.getElementById("parish-modal-content").innerHTML = ""; // Limpa o conteúdo
-            }
-        });
+            // Listener para fechar o modal de detalhes
+            document.getElementById("parish-modal").addEventListener("click", (e) => {
+                // Fecha se clicar no fundo ou no botão "Fechar"
+                if (e.target.id === "parish-modal" || e.target.id === "parish-modal-close") {
+                    document.getElementById("parish-modal").classList.add("hidden");
+                    document.getElementById("parish-modal-content").innerHTML = ""; // Limpa o conteúdo
+                }
+            });
 
-        // --- 8. INICIALIZAÇÃO DA PÁGINA ---
-        
-        // Verifica se os serviços do Firebase estão prontos antes de carregar os dados
-        if (db && auth) {
+            // Listener do botão de Login/Sair
+            document.getElementById("parish-login-button").addEventListener("click", () => {
+                // Se o usuário estiver logado, o botão agora é de "Sair"
+                if (auth.currentUser) {
+                    if (confirm("Tem certeza que deseja sair do painel?")) {
+                        signOut(auth);
+                    }
+                } else {
+                    // Se estiver deslogado, abre o modal de login
+                    document.getElementById("login-modal").classList.remove("hidden");
+                }
+            });
+
+            // Listener do modal de login
+            document.getElementById("login-cancel-button").addEventListener("click", () => {
+                document.getElementById("login-modal").classList.add("hidden");
+                document.getElementById("login-error").classList.add("hidden");
+                document.getElementById("login-form").reset();
+            });
+
+            document.getElementById("login-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const email = document.getElementById("login-email").value;
+                const password = document.getElementById("login-password").value;
+                const errorDiv = document.getElementById("login-error");
+                const submitButton = document.getElementById("login-submit-button");
+
+                submitButton.querySelector('.button-text').classList.add('hidden');
+                submitButton.querySelector('.loading-spinner').classList.remove('hidden');
+                submitButton.disabled = true;
+
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    // Sucesso! O onAuthStateChanged vai ser disparado
+                    document.getElementById("login-modal").classList.add("hidden");
+                    errorDiv.classList.add("hidden");
+                    document.getElementById("login-form").reset();
+                } catch (error) {
+                    console.error("Erro de login:", error.code);
+                    errorDiv.innerText = "Email ou senha inválidos. Tente novamente.";
+                    errorDiv.classList.remove("hidden");
+                } finally {
+                    submitButton.querySelector('.button-text').classList.remove('hidden');
+                    submitButton.querySelector('.loading-spinner').classList.add('hidden');
+                    submitButton.disabled = false;
+                }
+            });
+
+            // Listener de estado de login (o principal)
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // Usuário está logado
+                    console.log("Usuário logado:", user.uid);
+                    showAdminPanel(user);
+                } else {
+                    // Usuário está deslogado
+                    console.log("Usuário deslogado.");
+                    showPublicSite();
+                }
+            });
+            
+            // --- 8. INICIALIZAÇÃO DA PÁGINA ---
+            // Carrega o conteúdo inicial
             loadGlobalContent();
             loadParishes();
         }
@@ -803,6 +967,3 @@
     </script>
 </body>
 </html>
-
-
-
