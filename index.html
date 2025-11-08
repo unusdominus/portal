@@ -1002,7 +1002,8 @@
 
         // Função Genérica de Upload para o Cloudinary
         async function uploadImageToCloudinary(file) {
-            const CLOUDINARY_CLOUD_NAME = "dmmj5gpl"; // CORRIGIDO (sem o 'i' extra)
+            // CORREÇÃO FINAL: Garantir que AMBAS as funções usam o nome correto
+            const CLOUDINARY_CLOUD_NAME = "dmmj5gpl"; 
             const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
             if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
