@@ -340,7 +340,7 @@
                         
                         // Reinicia o timer do auto-play
                         if (carouselInterval) clearInterval(carouselInterval);
-                        carouselInterval = setInterval(nextSlide, 5000);
+                        carouselInterval = setInterval(nextSlide, 8000); // Alterado para 8 segundos
                     });
                     
                     // Inicia o carrossel
@@ -350,7 +350,7 @@
 
                     // Inicia auto-play se tiver mais de 1 slide
                     if (slides.length > 1) {
-                         carouselInterval = setInterval(nextSlide, 5000); // Muda a cada 5 segundos
+                         carouselInterval = setInterval(nextSlide, 8000); // Alterado para 8 segundos
                     }
 
                 }, (error) => {
@@ -737,7 +737,7 @@
                     console.log("Iniciando upload para o Cloudinary...");
                     
                     // --- CONFIGURAÇÃO DO CLOUDINARY ---
-                    const CLOUDINARY_CLOUD_NAME = "dmmj5gpl";
+                    const CLOUDINARY_CLOUD_NAME = "dmmj5gpl"; // CORRIGIDO (sem o 'i' extra)
                     const CLOUDINARY_UPLOAD_PRESET = "ml_default";
                     // --- FIM DA CONFIGURAÇÃO OBRIGATÓRIA ---
 
