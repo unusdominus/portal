@@ -338,19 +338,7 @@
                         carouselDots = document.getElementById("carousel-dots");
 
                         // Adiciona listeners de clique nas bolinhas (se houver)
-                        if (carouselDots) {
-                            carouselDots.addEventListener('click', (e) => {
-                                const targetDot = e.target.closest('button');
-                                if (!targetDot) return;
-                                
-                                const slideIndex = parseInt(targetDot.dataset.slide);
-                                goToSlide(slideIndex);
-                                
-                                // Reinicia o timer do auto-play
-                                if (carouselInterval) clearInterval(carouselInterval);
-                                carouselInterval = setInterval(nextSlide, 8000); // 8 segundos
-                            });
-                        }
+                        // REMOVIDO DAQUI - Movido para initializeAppListeners para evitar duplicação
                         
                         // Inicia o carrossel
                         updateSlidePosition();
@@ -1366,6 +1354,24 @@
                     document.getElementById(`tab-${tabId}`).classList.add("active");
                 });
             });
+
+            // NOVO: Listener de clique nas bolinhas do Carrossel
+            // Este listener é adicionado ao container PAI, uma única vez.
+            // Ele vai "apanhar" os cliques nas bolinhas que são criadas dinamicamente.
+            const dotsContainer = document.getElementById("carousel-dots");
+            if (dotsContainer) {
+                dotsContainer.addEventListener('click', (e) => {
+                    const targetDot = e.target.closest('button');
+                    if (!targetDot) return;
+                    
+                    const slideIndex = parseInt(targetDot.dataset.slide);
+                    goToSlide(slideIndex);
+                    
+                    // Reinicia o timer do auto-play
+                    if (carouselInterval) clearInterval(carouselInterval);
+                    carouselInterval = setInterval(nextSlide, 8000); // 8 segundos
+                });
+            }
 
             // Listener para abrir o modal de detalhes (clicando no card da paróquia)
             document.getElementById("parishes-list").addEventListener("click", (e) => {
