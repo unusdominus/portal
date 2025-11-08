@@ -286,81 +286,85 @@
                 const q = query(destaquesCol, orderBy("dataEvento", "desc"), limit(10));
 
                 onSnapshot(q, (snapshot) => {
-                    if (carouselInterval) clearInterval(carouselInterval); // Para o auto-play
+                    try { // Adiciona try para capturar erros de renderização
+                        if (carouselInterval) clearInterval(carouselInterval); // Para o auto-play
 
-                    const track = document.getElementById("carousel-track");
-                    const dotsContainer = document.getElementById("carousel-dots");
-                    
-                    track.innerHTML = '';
-                    dotsContainer.innerHTML = '';
-                    slides = [];
-                    currentSlide = 0;
+                        const track = document.getElementById("carousel-track");
+                        const dotsContainer = document.getElementById("carousel-dots");
+                        
+                        track.innerHTML = '';
+                        dotsContainer.innerHTML = '';
+                        slides = [];
+                        currentSlide = 0;
 
-                    if (snapshot.empty) {
-                        document.getElementById("destaque-loading").innerText = "Nenhum evento em destaque no momento.";
-                        return;
-                    }
+                        if (snapshot.empty) {
+                            document.getElementById("destaque-loading").innerText = "Nenhum evento em destaque no momento.";
+                            return;
+                        }
 
-                    snapshot.forEach((doc, index) => {
-                        const data = doc.data();
-                        slides.push(data);
+                        snapshot.forEach((doc, index) => {
+                            const data = doc.data();
+                            slides.push(data);
 
-                        // Cria o Slide
-                        const slide = document.createElement('a');
-                        slide.href = data.link || '#';
-                        slide.target = data.link ? '_blank' : '_self';
-                        slide.className = 'carousel-slide';
-                        slide.innerHTML = `
-                            <img src="${data.imagemUrl || 'https://placehold.co/800x400/c2b280/FFFFFF?text=Evento'}" alt="${data.titulo}" class="w-full h-full object-cover">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
-                            <div class="absolute bottom-0 left-0 p-6 md:p-8 text-white">
-                                <h3 class="text-2xl md:text-3xl font-bold">${data.titulo}</h3>
-                                <p class="text-lg md:text-xl">${data.subtitulo}</p>
-                            </div>
-                        `;
-                        track.appendChild(slide);
+                            // Cria o Slide
+                            const slide = document.createElement('a');
+                            slide.href = data.link || '#';
+                            slide.target = data.link ? '_blank' : '_self';
+                            slide.className = 'carousel-slide';
+                            slide.innerHTML = `
+                                <img src="${data.imagemUrl || 'https://placehold.co/800x400/c2b280/FFFFFF?text=Evento'}" alt="${data.titulo}" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+                                <div class="absolute bottom-0 left-0 p-6 md:p-8 text-white">
+                                    <h3 class="text-2xl md:text-3xl font-bold">${data.titulo}</h3>
+                                    <p class="text-lg md:text-xl">${data.subtitulo}</p>
+                                </div>
+                            `;
+                            track.appendChild(slide);
 
-                        // Cria a Bolinha (Dot)
-                        const dot = document.createElement('button');
-                        dot.className = 'carousel-dot';
-                        dot.dataset.slide = index;
-                        if (index === 0) dot.classList.add('active');
-                        dotsContainer.appendChild(dot);
-                    });
-                    
-                    if (slides.length <= 1) {
-                        dotsContainer.style.display = 'none'; // Esconde bolinhas se for só 1 slide
-                    }
-
-                    // Seleciona os elementos criados
-                    carouselTrack = document.getElementById("carousel-track");
-                    carouselDots = document.getElementById("carousel-dots");
-
-                    // Adiciona listeners de clique nas bolinhas (se houver)
-                    if (carouselDots) {
-                        carouselDots.addEventListener('click', (e) => {
-                            const targetDot = e.target.closest('button');
-                            if (!targetDot) return;
-                            
-                            const slideIndex = parseInt(targetDot.dataset.slide);
-                            goToSlide(slideIndex);
-                            
-                            // Reinicia o timer do auto-play
-                            if (carouselInterval) clearInterval(carouselInterval);
-                            carouselInterval = setInterval(nextSlide, 8000); // 8 segundos
+                            // Cria a Bolinha (Dot)
+                            const dot = document.createElement('button');
+                            dot.className = 'carousel-dot';
+                            dot.dataset.slide = index;
+                            if (index === 0) dot.classList.add('active');
+                            dotsContainer.appendChild(dot);
                         });
-                    }
-                    
-                    // Inicia o carrossel
-                    updateSlidePosition();
-                    document.getElementById("destaque-loading").style.display = 'none';
-                    document.getElementById("destaque-carousel-container").classList.remove("hidden");
+                        
+                        if (slides.length <= 1) {
+                            dotsContainer.style.display = 'none'; // Esconde bolinhas se for só 1 slide
+                        }
 
-                    // Inicia auto-play se tiver mais de 1 slide
-                    if (slides.length > 1) {
-                         carouselInterval = setInterval(nextSlide, 8000); // 8 segundos
-                    }
+                        // Seleciona os elementos criados
+                        carouselTrack = document.getElementById("carousel-track");
+                        carouselDots = document.getElementById("carousel-dots");
 
+                        // Adiciona listeners de clique nas bolinhas (se houver)
+                        if (carouselDots) {
+                            carouselDots.addEventListener('click', (e) => {
+                                const targetDot = e.target.closest('button');
+                                if (!targetDot) return;
+                                
+                                const slideIndex = parseInt(targetDot.dataset.slide);
+                                goToSlide(slideIndex);
+                                
+                                // Reinicia o timer do auto-play
+                                if (carouselInterval) clearInterval(carouselInterval);
+                                carouselInterval = setInterval(nextSlide, 8000); // 8 segundos
+                            });
+                        }
+                        
+                        // Inicia o carrossel
+                        updateSlidePosition();
+                        document.getElementById("destaque-loading").style.display = 'none';
+                        document.getElementById("destaque-carousel-container").classList.remove("hidden");
+
+                        // Inicia auto-play se tiver mais de 1 slide
+                        if (slides.length > 1) {
+                            carouselInterval = setInterval(nextSlide, 8000); // 8 segundos
+                        }
+                    } catch (e) {
+                        console.error("Erro renderizando carrossel:", e);
+                        document.getElementById("destaque-loading").innerText = "Erro ao renderizar destaques.";
+                    }
                 }, (error) => {
                      console.error("Erro ao carregar destaques do Firestore: ", error);
                      document.getElementById("destaque-loading").innerText = "Erro ao carregar destaques.";
@@ -404,72 +408,77 @@
                 const docRef = doc(db, "globalContent", "main");
                 
                 onSnapshot(docRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        
-                        // Renderiza Mural
-                        const muralContainer = document.getElementById("mural-content");
-                        
-                        // Define a aba ativa inicial
-                        if (!document.querySelector('.tab-button.active')) {
-                            document.querySelector('.tab-button[data-tab="liturgia"]').classList.add('active');
-                            document.getElementById('tab-liturgia').classList.add('active');
-                        }
+                    try { // Adiciona try para capturar erros de renderização
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            
+                            // Renderiza Mural
+                            const muralContainer = document.getElementById("mural-content");
+                            
+                            // Define a aba ativa inicial
+                            if (!document.querySelector('.tab-button.active')) {
+                                document.querySelector('.tab-button[data-tab="liturgia"]').classList.add('active');
+                                document.getElementById('tab-liturgia').classList.add('active');
+                            }
 
-                        // Liturgia
-                        if (data?.liturgiaDiaria) {
-                            const liturgia = data.liturgiaDiaria;
-                            document.getElementById("tab-liturgia").innerHTML = `
-                                <h4 class="font-semibold text-gray-700">${liturgia.data || 'Leituras do Dia'}</h4>
-                                <div class="text-sm text-gray-600 mt-2">
-                                    <p><strong>1ª Leitura:</strong> ${liturgia.primeiraLeitura?.ref || ''} - ${liturgia.primeiraLeitura?.texto ? liturgia.primeiraLeitura.texto.substring(0, 100) + '...' : ''}</p>
-                                    <p><strong>Salmo:</strong> ${liturgia.salmo?.ref || ''}</p>
-                                    <p><strong>Evangelho:</strong> ${liturgia.evangelho?.ref || ''} - ${liturgia.evangelho?.texto ? liturgia.evangelho.texto.substring(0, 100) + '...' : ''}</p>
-                                </div>
-                            `;
+                            // Liturgia
+                            if (data?.liturgiaDiaria) {
+                                const liturgia = data.liturgiaDiaria;
+                                document.getElementById("tab-liturgia").innerHTML = `
+                                    <h4 class="font-semibold text-gray-700">${liturgia.data || 'Leituras do Dia'}</h4>
+                                    <div class="text-sm text-gray-600 mt-2">
+                                        <p><strong>1ª Leitura:</strong> ${liturgia.primeiraLeitura?.ref || ''} - ${liturgia.primeiraLeitura?.texto ? liturgia.primeiraLeitura.texto.substring(0, 100) + '...' : ''}</p>
+                                        <p><strong>Salmo:</strong> ${liturgia.salmo?.ref || ''}</p>
+                                        <p><strong>Evangelho:</strong> ${liturgia.evangelho?.ref || ''} - ${liturgia.evangelho?.texto ? liturgia.evangelho.texto.substring(0, 100) + '...' : ''}</p>
+                                    </div>
+                                `;
+                            } else {
+                                document.getElementById("tab-liturgia").innerHTML = '<p class="text-sm text-gray-500">Liturgia não disponível.</p>';
+                            }
+
+                            // Santo do Dia
+                            if (data?.santoDoDia) {
+                                const santo = data.santoDoDia;
+                                document.getElementById("tab-santo").innerHTML = `
+                                    <img src="${santo.imagemUrl || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo'}" alt="${santo.nome}" class="w-full h-32 object-cover rounded-lg mb-2">
+                                    <h4 class="font-semibold text-gray-700">${santo.nome}</h4>
+                                    <p class="text-sm text-gray-600">${santo.bio ? santo.bio.substring(0, 150) + '...' : ''}</p>
+                                `;
+                            } else {
+                                document.getElementById("tab-santo").innerHTML = '<p class="text-sm text-gray-500">Santo do dia não disponível.</p>';
+                            }
+
+                            // Eventos
+                            const festasList = document.getElementById("festividades-list");
+                            festasList.innerHTML = '';
+                            if (data?.festividadesSemana?.length > 0) {
+                                data.festividadesSemana.forEach(f => {
+                                    festasList.innerHTML += `<li><strong>${f.dia}:</strong> ${f.evento}</li>`;
+                                });
+                            } else {
+                                festasList.innerHTML = '<li>Nenhuma festividade cadastrada.</li>';
+                            }
+
+                            const anunciosList = document.getElementById("anuncios-list");
+                            anunciosList.innerHTML = '';
+                            if (data?.anuncios?.length > 0) {
+                                data.anuncios.forEach(a => {
+                                    anunciosList.innerHTML += `<li><strong>${a.titulo}:</strong> ${a.descricao}</li>`;
+                                });
+                            } else {
+                                anunciosList.innerHTML = '<li>Nenhum anúncio cadastrado.</li>';
+                            }
+
+                            document.getElementById("mural-loading").style.display = 'none';
+                            muralContainer.classList.remove("hidden");
+
                         } else {
-                             document.getElementById("tab-liturgia").innerHTML = '<p class="text-sm text-gray-500">Liturgia não disponível.</p>';
+                            console.log("Documento global 'main' não encontrado!");
+                            document.getElementById("mural-loading").innerText = "Conteúdo do mural não encontrado.";
                         }
-
-                        // Santo do Dia
-                        if (data?.santoDoDia) {
-                            const santo = data.santoDoDia;
-                            document.getElementById("tab-santo").innerHTML = `
-                                <img src="${santo.imagemUrl || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo'}" alt="${santo.nome}" class="w-full h-32 object-cover rounded-lg mb-2">
-                                <h4 class="font-semibold text-gray-700">${santo.nome}</h4>
-                                <p class="text-sm text-gray-600">${santo.bio ? santo.bio.substring(0, 150) + '...' : ''}</p>
-                            `;
-                        } else {
-                             document.getElementById("tab-santo").innerHTML = '<p class="text-sm text-gray-500">Santo do dia não disponível.</p>';
-                        }
-
-                        // Eventos
-                        const festasList = document.getElementById("festividades-list");
-                        festasList.innerHTML = '';
-                        if (data?.festividadesSemana?.length > 0) {
-                            data.festividadesSemana.forEach(f => {
-                                festasList.innerHTML += `<li><strong>${f.dia}:</strong> ${f.evento}</li>`;
-                            });
-                        } else {
-                            festasList.innerHTML = '<li>Nenhuma festividade cadastrada.</li>';
-                        }
-
-                        const anunciosList = document.getElementById("anuncios-list");
-                        anunciosList.innerHTML = '';
-                        if (data?.anuncios?.length > 0) {
-                            data.anuncios.forEach(a => {
-                                anunciosList.innerHTML += `<li><strong>${a.titulo}:</strong> ${a.descricao}</li>`;
-                            });
-                        } else {
-                            anunciosList.innerHTML = '<li>Nenhum anúncio cadastrado.</li>';
-                        }
-
-                        document.getElementById("mural-loading").style.display = 'none';
-                        muralContainer.classList.remove("hidden");
-
-                    } else {
-                        console.log("Documento global 'main' não encontrado!");
-                        document.getElementById("mural-loading").innerText = "Conteúdo do mural não encontrado.";
+                    } catch (e) {
+                        console.error("Erro renderizando mural:", e);
+                        document.getElementById("mural-loading").innerText = "Erro ao renderizar mural.";
                     }
                 }, (error) => {
                      console.error("Erro ao carregar dados globais do Firestore: ", error);
@@ -486,31 +495,36 @@
                 const q = query(parishesCollection);
                 
                 onSnapshot(q, (querySnapshot) => {
-                    parishesCache = []; // Limpa o cache
-                    const listElement = document.getElementById("parishes-list");
-                    listElement.innerHTML = ''; // Limpa a lista atual
-                    
-                    if (querySnapshot.empty) {
-                        listElement.innerHTML = '<p class="text-gray-500 col-span-full">Nenhuma paróquia cadastrada ainda.</p>';
-                    }
-
-                    querySnapshot.forEach((doc) => {
-                        const parish = { id: doc.id, ...doc.data() };
-                        parishesCache.push(parish); // Adiciona ao cache
+                    try { // Adiciona try para capturar erros de renderização
+                        parishesCache = []; // Limpa o cache
+                        const listElement = document.getElementById("parishes-list");
+                        listElement.innerHTML = ''; // Limpa a lista atual
                         
-                        const card = `
-                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" data-parish-id="${parish.id}">
-                                <img src="${parish.fotoUrl || 'https://placehold.co/400x250/c2b280/FFFFFF?text=Igreja'}" alt="${parish.nome}" class="w-full h-48 object-cover">
-                                <div class="p-4">
-                                    <h3 class="text-lg font-semibold text-yellow-700">${parish.nome}</h3>
-                                    <p class="text-sm text-gray-500 truncate">${parish.endereco || 'Endereço não informado'}</p>
+                        if (querySnapshot.empty) {
+                            listElement.innerHTML = '<p class="text-gray-500 col-span-full">Nenhuma paróquia cadastrada ainda.</p>';
+                        }
+
+                        querySnapshot.forEach((doc) => {
+                            const parish = { id: doc.id, ...doc.data() };
+                            parishesCache.push(parish); // Adiciona ao cache
+                            
+                            const card = `
+                                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" data-parish-id="${parish.id}">
+                                    <img src="${parish.fotoUrl || 'https://placehold.co/400x250/c2b280/FFFFFF?text=Igreja'}" alt="${parish.nome}" class="w-full h-48 object-cover">
+                                    <div class="p-4">
+                                        <h3 class="text-lg font-semibold text-yellow-700">${parish.nome}</h3>
+                                        <p class="text-sm text-gray-500 truncate">${parish.endereco || 'Endereço não informado'}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        `;
-                        listElement.innerHTML += card;
-                    });
-                    
-                    document.getElementById("parishes-loading").style.display = 'none';
+                            `;
+                            listElement.innerHTML += card;
+                        });
+                        
+                        document.getElementById("parishes-loading").style.display = 'none';
+                    } catch (e) {
+                        console.error("Erro renderizando paróquias:", e);
+                        document.getElementById("parishes-loading").innerText = "Erro ao renderizar paróquias.";
+                    }
                 }, (error) => {
                     console.error("Erro ao carregar paróquias do Firestore: ", error);
                     document.getElementById("parishes-loading").innerText = "Erro ao carregar paróquias.";
@@ -837,55 +851,59 @@
             if (parishAvisosUnsubscribe) parishAvisosUnsubscribe();
 
             parishAvisosUnsubscribe = onSnapshot(q, (snapshot) => {
-                listDiv.innerHTML = ""; // Limpa a lista
-                if (snapshot.empty) {
-                    loadingDiv.innerText = "Nenhum aviso publicado.";
-                    return;
+                try { // Adiciona try para capturar erros de renderização
+                    listDiv.innerHTML = ""; // Limpa a lista
+                    if (snapshot.empty) {
+                        loadingDiv.innerText = "Nenhum aviso publicado.";
+                        return;
+                    }
+                    loadingDiv.style.display = 'none';
+
+                    snapshot.forEach(doc => {
+                        const aviso = { id: doc.id, ...doc.data() };
+                        const dataAv = aviso.dataPublicacao.toDate().toLocaleDateString('pt-BR');
+                        
+                        // Converte o Timestamp do evento para o formato do input
+                        const dataEventoStr = toLocalISOString(aviso.dataEvento);
+                        
+                        // Escapa aspas simples e duplas para o dataset
+                        const tituloEscapado = aviso.titulo.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        const descricaoEscapada = aviso.descricao.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+                        const card = document.createElement('div');
+                        card.className = "flex items-center gap-4 p-3 border rounded-lg";
+                        card.innerHTML = `
+                            ${aviso.imagemUrl ? `<img src="${aviso.imagemUrl}" class="w-16 h-16 object-cover rounded">` : '<div class="w-16 h-16 bg-gray-100 rounded flex items-center justify-center text-gray-400">Sem Foto</div>'}
+                            <div class="flex-1">
+                                <h4 class="font-semibold">${aviso.titulo}</h4>
+                                <p class="text-sm text-gray-600">${aviso.descricao.substring(0, 50)}...</p>
+                                <p class="text-xs text-gray-400">Publicado em: ${dataAv}</p>
+                                ${aviso.statusDestaque ? `<span class="text-xs font-medium ${aviso.statusDestaque === 'pendente' ? 'text-yellow-600' : 'text-green-600'}">Destaque: ${aviso.statusDestaque}</span>` : ''}
+                            </div>
+                            <button class="edit-aviso-button bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm" 
+                                data-id="${aviso.id}" 
+                                data-titulo="${tituloEscapado}" 
+                                data-descricao="${descricaoEscapada}"
+                                data-dataevento="${dataEventoStr}"
+                                data-solicitar="${aviso.statusDestaque ? 'true' : 'false'}">
+                                Editar
+                            </button>
+                            <button class="delete-aviso-button bg-red-100 text-red-700 px-3 py-1 rounded text-sm" data-id="${aviso.id}">Excluir</button>
+                        `;
+                        listDiv.appendChild(card);
+                    });
+                    
+                    // Adiciona listener para os botões de editar e deletar
+                    document.querySelectorAll(".edit-aviso-button").forEach(btn => {
+                        btn.addEventListener('click', handleEditAviso);
+                    });
+                    document.querySelectorAll(".delete-aviso-button").forEach(btn => {
+                        btn.addEventListener('click', handleDeleteAviso);
+                    });
+                } catch (e) {
+                    console.error("Erro renderizando avisos da paróquia:", e);
+                    loadingDiv.innerText = "Erro ao renderizar avisos.";
                 }
-                loadingDiv.style.display = 'none';
-
-                snapshot.forEach(doc => {
-                    const aviso = { id: doc.id, ...doc.data() };
-                    const dataAv = aviso.dataPublicacao.toDate().toLocaleDateString('pt-BR');
-                    
-                    // Converte o Timestamp do evento para o formato do input
-                    const dataEventoStr = toLocalISOString(aviso.dataEvento);
-                    
-                    // Escapa aspas simples e duplas para o dataset
-                    const tituloEscapado = aviso.titulo.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                    const descricaoEscapada = aviso.descricao.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-                    const card = document.createElement('div');
-                    card.className = "flex items-center gap-4 p-3 border rounded-lg";
-                    card.innerHTML = `
-                        ${aviso.imagemUrl ? `<img src="${aviso.imagemUrl}" class="w-16 h-16 object-cover rounded">` : '<div class="w-16 h-16 bg-gray-100 rounded flex items-center justify-center text-gray-400">Sem Foto</div>'}
-                        <div class="flex-1">
-                            <h4 class="font-semibold">${aviso.titulo}</h4>
-                            <p class="text-sm text-gray-600">${aviso.descricao.substring(0, 50)}...</p>
-                            <p class="text-xs text-gray-400">Publicado em: ${dataAv}</p>
-                            ${aviso.statusDestaque ? `<span class="text-xs font-medium ${aviso.statusDestaque === 'pendente' ? 'text-yellow-600' : 'text-green-600'}">Destaque: ${aviso.statusDestaque}</span>` : ''}
-                        </div>
-                        <button class="edit-aviso-button bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm" 
-                            data-id="${aviso.id}" 
-                            data-titulo="${tituloEscapado}" 
-                            data-descricao="${descricaoEscapada}"
-                            data-dataevento="${dataEventoStr}"
-                            data-solicitar="${aviso.statusDestaque ? 'true' : 'false'}">
-                            Editar
-                        </button>
-                        <button class="delete-aviso-button bg-red-100 text-red-700 px-3 py-1 rounded text-sm" data-id="${aviso.id}">Excluir</button>
-                    `;
-                    listDiv.appendChild(card);
-                });
-                
-                // Adiciona listener para os botões de editar e deletar
-                document.querySelectorAll(".edit-aviso-button").forEach(btn => {
-                    btn.addEventListener('click', handleEditAviso);
-                });
-                document.querySelectorAll(".delete-aviso-button").forEach(btn => {
-                    btn.addEventListener('click', handleDeleteAviso);
-                });
-
             }, (error) => {
                 console.error("Erro ao carregar avisos da paróquia:", error);
                 loadingDiv.innerText = "Erro ao carregar avisos.";
@@ -1191,42 +1209,46 @@
             const q = query(requestsCol, where("status", "==", "pendente"), orderBy("dataEvento", "asc"));
 
             onSnapshot(q, (snapshot) => {
-                const listDiv = document.getElementById("requests-list");
-                const loadingDiv = document.getElementById("requests-loading");
-                listDiv.innerHTML = ""; // Limpa a lista
+                try { // Adiciona try para capturar erros de renderização
+                    const listDiv = document.getElementById("requests-list");
+                    const loadingDiv = document.getElementById("requests-loading");
+                    listDiv.innerHTML = ""; // Limpa a lista
 
-                if (snapshot.empty) {
-                    loadingDiv.innerText = "Nenhum pedido pendente no momento.";
-                    return;
+                    if (snapshot.empty) {
+                        loadingDiv.innerText = "Nenhum pedido pendente no momento.";
+                        return;
+                    }
+                    
+                    loadingDiv.style.display = 'none';
+
+                    snapshot.forEach(doc => {
+                        const request = { id: doc.id, ...doc.data() };
+                        const dataFormatada = request.dataEvento.toDate().toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+
+                        const card = document.createElement('div');
+                        card.className = "flex flex-col md:flex-row items-start md:items-center gap-4 p-4 border rounded-lg shadow-sm";
+                        card.innerHTML = `
+                            <img src="${request.imagemUrl}" alt="${request.titulo}" class="w-full md:w-32 h-32 md:h-20 object-cover rounded-lg">
+                            <div class="flex-1">
+                                <h4 class="text-lg font-bold">${request.titulo}</h4>
+                                <p class="text-sm text-gray-600">${request.subtitulo}</p>
+                                <p class="text-sm text-gray-500">Data do Evento: ${dataFormatada}</p>
+                            </div>
+                            <div class="flex gap-2 w-full md:w-auto">
+                                <button class="approve-button w-1/2 md:w-auto bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600" data-id="${request.id}">Aprovar</button>
+                                <button class="reject-button w-1/2 md:w-auto bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600" data-id="${request.id}">Rejeitar</button>
+                            </div>
+                        `;
+                        listDiv.appendChild(card);
+                    });
+
+                    // Adiciona listeners para os botões de aprovar/rejeitar
+                    document.querySelectorAll(".approve-button").forEach(btn => btn.addEventListener('click', handleApproveRequest));
+                    document.querySelectorAll(".reject-button").forEach(btn => btn.addEventListener('click', handleRejectRequest));
+                } catch (e) {
+                    console.error("Erro renderizando pedidos pendentes:", e);
+                    document.getElementById("requests-loading").innerText = "Erro ao renderizar pedidos.";
                 }
-                
-                loadingDiv.style.display = 'none';
-
-                snapshot.forEach(doc => {
-                    const request = { id: doc.id, ...doc.data() };
-                    const dataFormatada = request.dataEvento.toDate().toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
-
-                    const card = document.createElement('div');
-                    card.className = "flex flex-col md:flex-row items-start md:items-center gap-4 p-4 border rounded-lg shadow-sm";
-                    card.innerHTML = `
-                        <img src="${request.imagemUrl}" alt="${request.titulo}" class="w-full md:w-32 h-32 md:h-20 object-cover rounded-lg">
-                        <div class="flex-1">
-                            <h4 class="text-lg font-bold">${request.titulo}</h4>
-                            <p class="text-sm text-gray-600">${request.subtitulo}</p>
-                            <p class="text-sm text-gray-500">Data do Evento: ${dataFormatada}</p>
-                        </div>
-                        <div class="flex gap-2 w-full md:w-auto">
-                            <button class="approve-button w-1/2 md:w-auto bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600" data-id="${request.id}">Aprovar</button>
-                            <button class="reject-button w-1/2 md:w-auto bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600" data-id="${request.id}">Rejeitar</button>
-                        </div>
-                    `;
-                    listDiv.appendChild(card);
-                });
-
-                // Adiciona listeners para os botões de aprovar/rejeitar
-                document.querySelectorAll(".approve-button").forEach(btn => btn.addEventListener('click', handleApproveRequest));
-                document.querySelectorAll(".reject-button").forEach(btn => btn.addEventListener('click', handleRejectRequest));
-
             }, (error) => {
                 console.error("Erro ao carregar pedidos:", error);
                 document.getElementById("requests-loading").innerText = "Erro ao carregar pedidos.";
