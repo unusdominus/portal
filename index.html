@@ -426,7 +426,7 @@
         // --- MODIFICAÇÃO: Funções do Mural (do seu ficheiro) ---
         async function carregarLiturgia() {
             try {
-                const res = await fetch('https://liturgia.up.railway.app/');
+                const res = await fetch('https://liturgia.up.railway.app/v2/');
                 if (!res.ok) throw new Error('Erro na API principal');
                 const data = await res.json();
                 return `
@@ -1545,3 +1545,4 @@
     </script>
 </body>
 </html>
+
