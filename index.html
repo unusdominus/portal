@@ -278,7 +278,7 @@
 
         // Função para carregar o conteúdo global (Carrossel e Mural)
         async function loadGlobalContent() {
-            // Carrega o Mural (globalContent/main E API)
+            // Carrega o Mural (globalContent/main)
             loadMural();
             // Carrega o Carrossel (coleção 'destaques')
             loadCarousel();
@@ -679,7 +679,7 @@
                 }
 
                 // 3. Se não for nenhum, é um erro
-                alert("Erro: Seu usuário está logado, mas não está associado a uma paróquia nem é um Super Administrador.");
+                alert("Erro: Seu usuário está logado, mas não está associado a nenhuma paróquia nem é um Super Administrador.");
                 await signOut(auth);
             } catch (error) {
                 console.error("Erro fatal ao verificar permissão:", error);
