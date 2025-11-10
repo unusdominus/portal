@@ -116,11 +116,11 @@
                 <div id="mural-content" class="bg-white shadow-lg rounded-lg overflow-hidden hidden h-96">
                     <div class="p-6 h-full flex flex-col">
                         <h2 class="text-2xl font-bold text-yellow-700 mb-1">Mural Diocesano</h2>
-                        <p class="text-sm text-gray-600 mb-2 flex items-center gap-1">✝️ <span><strong>Paz e bem!</strong> Confira abaixo a liturgia e o santo do dia.</span></p>
-                        <p id="mural-date" class="text-sm text-gray-500 mb-4 flex items-center gap-1"><span>📅</span><span id="mural-date-text"></span></p>
+                        <!-- <p class="text-sm text-gray-600 mb-2 flex items-center gap-1">✝️ <span><strong>Paz e bem!</strong> Confira abaixo a liturgia e o santo do dia.</span></p> -->
+                        <!-- <p id="mural-date" class="text-sm text-gray-500 mb-4 flex items-center gap-1"><span>📅</span><span id="mural-date-text"></span></p> -->
                         
                         <!-- Abas do Mural -->
-                        <div class="border-b border-gray-200">
+                        <div class="border-b border-gray-200 mt-2"> <!-- Adicionado mt-2 para compensar o espaço removido -->
                             <nav class="-mb-px flex space-x-4" aria-label="Tabs">
                                 <button class="tab-button active" data-tab="liturgia">Liturgia</button>
                                 <button class="tab-button" data-tab="santo">Santo do Dia</button>
@@ -298,11 +298,13 @@
         // --- 5. LÓGICA DO SITE PÚBLICO ---
 
         // MODIFICAÇÃO: Função auxiliar para formatar a data (do seu ficheiro)
+        /* REMOVIDA - Não é mais necessária
         function formatarDataAtual() {
             const hoje = new Date();
             const opcoes = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             return hoje.toLocaleDateString('pt-BR', opcoes);
         }
+        */
 
         // Função para carregar o conteúdo global (Carrossel e Mural)
         async function loadGlobalContent() {
@@ -477,8 +479,8 @@
             const festasList = document.getElementById('festividades-list');
             const anunciosList = document.getElementById('anuncios-list');
 
-            // Define a data atual
-            document.getElementById('mural-date-text').textContent = formatarDataAtual();
+            // Define a data atual (REMOVIDO)
+            // document.getElementById('mural-date-text').textContent = formatarDataAtual();
             
             // Define a aba ativa inicial
             if (!document.querySelector('.tab-button.active')) {
@@ -1200,7 +1202,7 @@
         // Função Genérica de Upload para o Cloudinary
         async function uploadImageToCloudinary(file) {
             // CORREÇÃO FINAL: Garantir que AMBAS as funções usam o nome correto
-            const CLOUDINARY_CLOUD_NAME = "dmmij5gpl";
+            const CLOUDINARY_CLOUD_NAME = "dmmij5gpl"; // CORRIGIDO: Sem o 'i' extra
             const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
             if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
