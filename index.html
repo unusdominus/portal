@@ -101,11 +101,14 @@
                 <div id="mural-loading" class="bg-white shadow-lg rounded-lg p-6 animate-pulse h-96 flex items-center justify-center">Carregando mural...</div>
                 <div id="mural-content" class="bg-white shadow-lg rounded-lg overflow-hidden hidden h-96">
                     <div class="p-6 h-full flex flex-col">
-                        <h2 class="text-2xl font-bold text-yellow-700 mb-4">Mural Diocesano</h2>
+                        <h2 class="text-2xl font-bold text-yellow-700 mb-2">Mural Diocesano</h2>
+                        <!-- MODIFICAÇÃO: Adicionado o parágrafo da data -->
+                        <p id="mural-date" class="text-sm text-gray-500 mb-4"></p>
+                        
                         <!-- Abas do Mural -->
                         <div class="border-b border-gray-200">
                             <nav class="-mb-px flex space-x-4" aria-label="Tabs">
-                                <button class="tab-button" data-tab="liturgia">Liturgia</button>
+                                <button class="tab-button active" data-tab="liturgia">Liturgia</button> <!-- Definido 'active' por padrão -->
                                 <button class="tab-button" data-tab="santo">Santo do Dia</button>
                                 <button class="tab-button" data-tab="eventos">Eventos</button>
                             </nav>
@@ -113,13 +116,13 @@
                         <!-- Conteúdo das Abas -->
                         <div id="mural-tabs-content" class="mt-4 flex-1 overflow-y-auto">
                             <!-- Liturgia -->
-                            <div id="tab-liturgia" class="tab-content space-y-2">
-                                <!-- Conteúdo será preenchido pelo Firestore -->
+                            <div id="tab-liturgia" class="tab-content active space-y-2"> <!-- Definido 'active' por padrão -->
+                                <!-- Conteúdo será preenchido pela API -->
                                 <p class="text-sm text-gray-500">Carregando liturgia...</p>
                             </div>
                             <!-- Santo do Dia -->
                             <div id="tab-santo" class="tab-content space-y-2">
-                                <!-- Conteúdo será preenchido pelo Firestore -->
+                                <!-- Conteúdo será preenchido pela API -->
                                 <p class="text-sm text-gray-500">Carregando santo...</p>
                             </div>
                             <!-- Eventos/Festas -->
@@ -276,9 +279,16 @@
 
         // --- 5. LÓGICA DO SITE PÚBLICO ---
 
+        // MODIFICAÇÃO: Função auxiliar para formatar a data (do seu ficheiro)
+        function formatarDataAtual() {
+            const hoje = new Date();
+            const opcoes = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return hoje.toLocaleDateString('pt-BR', opcoes);
+        }
+
         // Função para carregar o conteúdo global (Carrossel e Mural)
         async function loadGlobalContent() {
-            // Carrega o Mural (globalContent/main)
+            // Carrega o Mural (globalContent/main E APIs)
             loadMural();
             // Carrega o Carrossel (coleção 'destaques')
             loadCarousel();
@@ -393,98 +403,125 @@
             }
         }
 
-        // --- 'loadMural' AGORA CARREGA TUDO DO FIRESTORE ---
-        // --- CORRIGIDO: Removida a chamada de API externa ('fetch') ---
+        // --- MODIFICAÇÃO: 'loadMural' AGORA É HÍBRIDO (APIs + FIRESTORE) ---
         async function loadMural() {
-            
             const liturgiaTab = document.getElementById("tab-liturgia");
             const santoTab = document.getElementById("tab-santo");
+            const festasList = document.getElementById("festividades-list");
+            const anunciosList = document.getElementById("anuncios-list");
+            const muralDate = document.getElementById("mural-date");
+
+            // Define a data atual (do seu ficheiro)
+            muralDate.textContent = formatarDataAtual();
             
-             try {
-                // Carrega TUDO do documento 'globalContent/main'
+            // Define a aba ativa inicial
+            if (!document.querySelector('.tab-button.active')) {
+                document.querySelector('.tab-button[data-tab="liturgia"]').classList.add('active');
+                document.getElementById('tab-liturgia').classList.add('active');
+            }
+            
+            // Mensagens de carregamento
+            liturgiaTab.innerHTML = `<p class='text-sm text-gray-500'>Carregando liturgia...</p>`;
+            santoTab.innerHTML = `<p class='text-sm text-gray-500'>Carregando santo...</p>`;
+            festasList.innerHTML = `<p class="text-sm text-gray-500">Carregando...</p>`;
+            anunciosList.innerHTML = `<p class="text-sm text-gray-500">Carregando...</p>`;
+            
+            document.getElementById("mural-loading").style.display = 'none';
+            document.getElementById("mural-content").classList.remove("hidden");
+
+            try {
+                // === 1️⃣ LITURGIA DO DIA (API EXTERNA - do seu ficheiro) ===
+                try {
+                    const res = await fetch("https://liturgia.up.railway.app/");
+                    if (!res.ok) throw new Error("Erro ao acessar API de liturgia");
+                    const data = await res.json();
+
+                    liturgiaTab.innerHTML = `
+                        <h4 class='font-semibold text-gray-700'>${data.dia}</h4>
+                        <div class='text-sm text-gray-600 mt-2 space-y-2'>
+                        <p><strong>1ª Leitura:</strong> ${data.liturgia.primeiraLeitura.titulo}</p>
+                        <p><strong>Salmo:</strong> ${data.liturgia.salmo.titulo}</p>
+                        <p><strong>Evangelho:</strong> ${data.liturgia.evangelho.titulo}</p>
+                        </div>
+                        <hr class='my-2'>
+                        <details class='text-sm text-gray-600'>
+                        <summary class='cursor-pointer text-yellow-700 font-medium'>Ver textos completos</summary>
+                        <div class='mt-2 space-y-2'>
+                            <p><strong>1ª Leitura:</strong><br>${data.liturgia.primeiraLeitura.texto}</p>
+                            <p><strong>Salmo:</strong><br>${data.liturgia.salmo.texto}</p>
+                            <p><strong>Evangelho:</strong><br>${data.liturgia.evangelho.texto}</p>
+                        </div>
+                        </details>
+                    `;
+                } catch (errLiturgia) {
+                    console.error('Erro ao buscar Liturgia:', errLiturgia);
+                    liturgiaTab.innerHTML = `<p class='text-sm text-red-600'>Não foi possível carregar a liturgia do dia.</p>`;
+                }
+
+                // === 2️⃣ SANTO DO DIA (API EXTERNA - do seu ficheiro) ===
+                try {
+                    const santoRes = await fetch("https://www.santoapi.com/api/v1/today");
+                    if (santoRes.ok) {
+                        const santoData = await santoRes.json();
+                        santoTab.innerHTML = `
+                            <img src='${santoData.image || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia'}' class='w-full h-32 object-cover rounded-lg mb-2'>
+                            <h4 class='font-semibold text-gray-700'>${santoData.name}</h4>
+                            <p class='text-sm text-gray-600'>${santoData.description ? santoData.description.substring(0, 150) + '...' : 'Sem descrição disponível.'}</p>
+                        `;
+                    } else {
+                        throw new Error('API de santo indisponível');
+                    }
+                } catch (errSanto) {
+                    console.warn('Erro ao buscar Santo do Dia:', errSanto);
+                    santoTab.innerHTML = `
+                        <img src='https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia' class='w-full h-32 object-cover rounded-lg mb-2'>
+                        <h4 class='font-semibold text-gray-700'>Santo do Dia</h4>
+                        <p class='text-sm text-gray-600'>Não foi possível carregar o Santo do Dia.</p>
+                    `;
+                }
+
+                // === 3️⃣ FESTIVIDADES E ANÚNCIOS (DO *NOSSO* FIRESTORE) ===
+                // Esta parte foi preservada do nosso código anterior.
                 const docRef = doc(db, "globalContent", "main");
-                
                 onSnapshot(docRef, (docSnap) => {
-                    try {
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            
-                            // Define a aba ativa inicial
-                            if (!document.querySelector('.tab-button.active')) {
-                                document.querySelector('.tab-button[data-tab="liturgia"]').classList.add('active');
-                                document.getElementById('tab-liturgia').classList.add('active');
-                            }
-
-                            // NOVO: Renderiza Liturgia (do Firestore)
-                            if (data?.liturgiaDiaria) {
-                                const liturgia = data.liturgiaDiaria;
-                                liturgiaTab.innerHTML = `
-                                    <h4 class="font-semibold text-gray-700">${liturgia.data || 'Leituras do Dia'}</h4>
-                                    <div class="text-sm text-gray-600 mt-2 space-y-1">
-                                        <p><strong>1ª Leitura:</strong> ${liturgia.primeiraLeitura?.ref || 'N/A'}</p>
-                                        <p><strong>Salmo:</strong> ${liturgia.salmo?.ref || 'N/A'}</p>
-                                        <p><strong>Evangelho:</strong> ${liturgia.evangelho?.ref || 'N/A'}</p>
-                                    </div>
-                                `;
-                            } else {
-                                liturgiaTab.innerHTML = '<p class="text-sm text-gray-500">Liturgia não disponível.</p>';
-                            }
-
-                            // NOVO: Renderiza Santo (do Firestore)
-                            if (data?.santoDoDia) {
-                                const santo = data.santoDoDia;
-                                santoTab.innerHTML = `
-                                    <img src="${santo.imagemUrl || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo'}" alt="${santo.nome}" class="w-full h-32 object-cover rounded-lg mb-2">
-                                    <h4 class="font-semibold text-gray-700">${santo.nome}</h4>
-                                    <p class="text-sm text-gray-600">${santo.bio ? santo.bio.substring(0, 150) + '...' : 'Informação não disponível.'}</p>
-                                `;
-                            } else {
-                                santoTab.innerHTML = '<p class="text-sm text-gray-500">Santo do dia não disponível.</p>';
-                            }
-
-                            // Eventos (do Firestore)
-                            const festasList = document.getElementById("festividades-list");
-                            festasList.innerHTML = '';
-                            if (data?.festividadesSemana?.length > 0) {
-                                data.festividadesSemana.forEach(f => {
-                                    festasList.innerHTML += `<li><strong>${f.dia}:</strong> ${f.evento}</li>`;
-                                });
-                            } else {
-                                festasList.innerHTML = '<li>Nenhuma festividade cadastrada.</li>';
-                            }
-
-                            // Anúncios (do Firestore)
-                            const anunciosList = document.getElementById("anuncios-list");
-                            anunciosList.innerHTML = '';
-                            if (data?.anuncios?.length > 0) {
-                                data.anuncios.forEach(a => {
-                                    anunciosList.innerHTML += `<li><strong>${a.titulo}:</strong> ${a.descricao}</li>`;
-                                });
-                            } else {
-                                anunciosList.innerHTML = '<li>Nenhum anúncio cadastrado.</li>';
-                            }
-
-                            document.getElementById("mural-loading").style.display = 'none';
-                            document.getElementById("mural-content").classList.remove("hidden");
-
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        
+                        // Eventos (do Firestore)
+                        festasList.innerHTML = '';
+                        if (data?.festividadesSemana?.length > 0) {
+                            data.festividadesSemana.forEach(f => {
+                                festasList.innerHTML += `<li><strong>${f.dia}:</strong> ${f.evento}</li>`;
+                            });
                         } else {
-                            console.log("Documento global 'main' não encontrado.");
-                            document.getElementById("mural-loading").innerText = "Conteúdo não encontrado.";
+                            festasList.innerHTML = '<li>Nenhuma festividade cadastrada.</li>';
                         }
-                    } catch (e) {
-                        console.error("Erro renderizando mural (Firestore):", e);
-                        document.getElementById("mural-loading").innerText = "Erro ao renderizar mural.";
+
+                        // Anúncios (do Firestore)
+                        anunciosList.innerHTML = '';
+                        if (data?.anuncios?.length > 0) {
+                            data.anuncios.forEach(a => {
+                                anunciosList.innerHTML += `<li><strong>${a.titulo}:</strong> ${a.descricao}</li>`;
+                            });
+                        } else {
+                            anunciosList.innerHTML = '<li>Nenhum anúncio cadastrado.</li>';
+                        }
+                    } else {
+                         festasList.innerHTML = '<li>Erro: Documento global não encontrado.</li>';
+                         anunciosList.innerHTML = '<li>Erro: Documento global não encontrado.</li>';
                     }
                 }, (error) => {
-                     console.error("Erro ao carregar dados globais do Firestore: ", error);
-                     document.getElementById("mural-loading").innerText = "Erro ao carregar mural.";
+                    console.error("Erro ao carregar eventos/anúncios do Firestore:", error);
+                    festasList.innerHTML = '<li>Erro ao carregar eventos.</li>';
+                    anunciosList.innerHTML = '<li>Erro ao carregar anúncios.</li>';
                 });
-            } catch (error) {
-                console.error("Erro ao carregar conteúdo do Mural (Firestore):", error);
+
+            } catch (err) {
+                console.error('Erro geral ao carregar mural:', err);
                 document.getElementById("mural-loading").innerText = "Erro ao carregar mural.";
             }
         }
-
+        
         // Função para carregar todas as paróquias
         async function loadParishes() {
             try {
