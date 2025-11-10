@@ -404,7 +404,7 @@
                 santoTab.innerHTML = '<p class="text-sm text-gray-500">Carregando santo...</p>';
 
                 // API pública de liturgia diária
-                const response = await fetch('https://liturgiadiaria.site/api/dia/hoje');
+                const response = await fetch('https://api-liturgia-diaria.vercel.app/cn');
                 if (!response.ok) throw new Error('Falha ao carregar API de liturgia');
                 const data = await response.json();
 
@@ -1488,3 +1488,4 @@
     </script>
 </body>
 </html>
+
