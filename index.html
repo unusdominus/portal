@@ -21,6 +21,16 @@
             height: 24px;
             animation: spin 1s linear infinite;
         }
+        /* Spinner do Novo Mural */
+        .mural-spinner {
+            width: 24px;
+            height: 24px;
+            border: 4px solid rgba(180, 83, 9, 0.2); /* Amarelo mais claro */
+            border-top-color: #b45309; /* Amarelo principal */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -97,18 +107,22 @@
 
                 </div>
 
-                <!-- Mural Diocesano (1/3) -->
-                <div id="mural-loading" class="bg-white shadow-lg rounded-lg p-6 animate-pulse h-96 flex items-center justify-center">Carregando mural...</div>
+                <!-- Mural Diocesano (1/3) - MODIFICADO CONFORME O SEU FICHEIRO -->
+                <div id="mural-loading" class="bg-white shadow-lg rounded-lg p-6 h-96 flex flex-col items-center justify-center text-yellow-700">
+                    <div class="mural-spinner mb-4"></div>
+                    <p class="text-sm font-medium text-gray-500">Carregando mural...</p>
+                </div>
+
                 <div id="mural-content" class="bg-white shadow-lg rounded-lg overflow-hidden hidden h-96">
                     <div class="p-6 h-full flex flex-col">
-                        <h2 class="text-2xl font-bold text-yellow-700 mb-2">Mural Diocesano</h2>
-                        <!-- MODIFICAÇÃO: Adicionado o parágrafo da data -->
-                        <p id="mural-date" class="text-sm text-gray-500 mb-4"></p>
+                        <h2 class="text-2xl font-bold text-yellow-700 mb-1">Mural Diocesano</h2>
+                        <p class="text-sm text-gray-600 mb-2 flex items-center gap-1">✝️ <span><strong>Paz e bem!</strong> Confira abaixo a liturgia e o santo do dia.</span></p>
+                        <p id="mural-date" class="text-sm text-gray-500 mb-4 flex items-center gap-1"><span>📅</span><span id="mural-date-text"></span></p>
                         
                         <!-- Abas do Mural -->
                         <div class="border-b border-gray-200">
                             <nav class="-mb-px flex space-x-4" aria-label="Tabs">
-                                <button class="tab-button active" data-tab="liturgia">Liturgia</button> <!-- Definido 'active' por padrão -->
+                                <button class="tab-button active" data-tab="liturgia">Liturgia</button>
                                 <button class="tab-button" data-tab="santo">Santo do Dia</button>
                                 <button class="tab-button" data-tab="eventos">Eventos</button>
                             </nav>
@@ -116,21 +130,25 @@
                         <!-- Conteúdo das Abas -->
                         <div id="mural-tabs-content" class="mt-4 flex-1 overflow-y-auto">
                             <!-- Liturgia -->
-                            <div id="tab-liturgia" class="tab-content active space-y-2"> <!-- Definido 'active' por padrão -->
-                                <!-- Conteúdo será preenchido pela API -->
-                                <p class="text-sm text-gray-500">Carregando liturgia...</p>
+                            <div id="tab-liturgia" class="tab-content active space-y-2">
+                                <div class='flex flex-col items-center justify-center text-yellow-700'>
+                                    <div class='mural-spinner mb-2'></div>
+                                    <p class='text-sm text-gray-500'>Carregando liturgia...</p>
+                                </div>
                             </div>
                             <!-- Santo do Dia -->
                             <div id="tab-santo" class="tab-content space-y-2">
-                                <!-- Conteúdo será preenchido pela API -->
-                                <p class="text-sm text-gray-500">Carregando santo...</p>
+                                <div class='flex flex-col items-center justify-center text-yellow-700'>
+                                    <div class='mural-spinner mb-2'></div>
+                                    <p class='text-sm text-gray-500'>Carregando santo...</p>
+                                </div>
                             </div>
                             <!-- Eventos/Festas -->
                             <div id="tab-eventos" class="tab-content space-y-4">
                                 <div>
                                     <h4 class="font-semibold text-gray-700">Festividades da Semana</h4>
                                     <ul id="festividades-list" class="list-disc list-inside text-sm text-gray-600">
-                                        <p class="text-sm text-gray-500">Carregando...</p>
+                                        <p class_all_="" text-sm="" text-gray-500"="">Carregando...</p>
                                     </ul>
                                 </div>
                                 <div>
@@ -403,85 +421,82 @@
             }
         }
 
+        // --- MODIFICAÇÃO: Funções do Mural (do seu ficheiro) ---
+        async function carregarLiturgia() {
+            try {
+                const res = await fetch('https://liturgia.up.railway.app/');
+                if (!res.ok) throw new Error('Erro na API principal');
+                const data = await res.json();
+                return `
+                    <h4 class='font-semibold text-gray-700'>${data.dia}</h4>
+                    <div class='text-sm text-gray-600 mt-2 space-y-2'>
+                    <p><strong>1ª Leitura:</strong> ${data.liturgia.primeiraLeitura.titulo}</p>
+                    <p><strong>Salmo:</strong> ${data.liturgia.salmo.titulo}</p>
+                    <p><strong>Evangelho:</strong> ${data.liturgia.evangelho.titulo}</p>
+                    </div>
+                    <hr class='my-2'>
+                    <details class='text-sm text-gray-600'>
+                    <summary class='cursor-pointer text-yellow-700 font-medium'>Ver textos completos</summary>
+                    <div class='mt-2 space-y-2'>
+                        <p><strong>1ª Leitura:</strong><br>${data.liturgia.primeiraLeitura.texto}</p>
+                        <p><strong>Salmo:</strong><br>${data.liturgia.salmo.texto}</p>
+                        <p><strong>Evangelho:</strong><br>${data.liturgia.evangelho.texto}</p>
+                    </div>
+                    </details>
+                `;
+            } catch (error) {
+                console.warn('Erro ao buscar liturgia, usando fallback:', error);
+                return `<p class='text-sm text-gray-600'>Não foi possível carregar a liturgia de hoje. Tente novamente mais tarde.</p>`;
+            }
+        }
+
+        async function carregarSanto(santoTab) {
+            try {
+                const santoRes = await fetch('https://www.santoapi.com/api/v1/today');
+                if (!santoRes.ok) throw new Error('Erro na API de santo');
+                const santoData = await santoRes.json();
+                santoTab.innerHTML = `
+                    <img src='${santoData.image || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia'}' class='w-full h-32 object-cover rounded-lg mb-2'>
+                    <h4 class='font-semibold text-gray-700'>${santoData.name}</h4>
+                    <p class='text-sm text-gray-600'>${santoData.description ? santoData.description.substring(0, 150) + '...' : 'Sem descrição disponível.'}</p>
+                `;
+            } catch (errSanto) {
+                console.warn('Erro ao buscar Santo do Dia:', errSanto);
+                santoTab.innerHTML = `
+                    <img src='https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia' class='w-full h-32 object-cover rounded-lg mb-2'>
+                    <h4 class='font-semibold text-gray-700'>Santo do Dia</h4>
+                    <p class='text-sm text-gray-600'>Não foi possível carregar o Santo do Dia. Verifique sua conexão.</p>
+                `;
+            }
+        }
+
         // --- MODIFICAÇÃO: 'loadMural' AGORA É HÍBRIDO (APIs + FIRESTORE) ---
         async function loadMural() {
-            const liturgiaTab = document.getElementById("tab-liturgia");
-            const santoTab = document.getElementById("tab-santo");
-            const festasList = document.getElementById("festividades-list");
-            const anunciosList = document.getElementById("anuncios-list");
-            const muralDate = document.getElementById("mural-date");
+            const liturgiaTab = document.getElementById('tab-liturgia');
+            const santoTab = document.getElementById('tab-santo');
+            const festasList = document.getElementById('festividades-list');
+            const anunciosList = document.getElementById('anuncios-list');
 
-            // Define a data atual (do seu ficheiro)
-            muralDate.textContent = formatarDataAtual();
+            // Define a data atual
+            document.getElementById('mural-date-text').textContent = formatarDataAtual();
             
             // Define a aba ativa inicial
             if (!document.querySelector('.tab-button.active')) {
                 document.querySelector('.tab-button[data-tab="liturgia"]').classList.add('active');
                 document.getElementById('tab-liturgia').classList.add('active');
             }
-            
-            // Mensagens de carregamento
-            liturgiaTab.innerHTML = `<p class='text-sm text-gray-500'>Carregando liturgia...</p>`;
-            santoTab.innerHTML = `<p class='text-sm text-gray-500'>Carregando santo...</p>`;
-            festasList.innerHTML = `<p class="text-sm text-gray-500">Carregando...</p>`;
-            anunciosList.innerHTML = `<p class="text-sm text-gray-500">Carregando...</p>`;
-            
-            document.getElementById("mural-loading").style.display = 'none';
-            document.getElementById("mural-content").classList.remove("hidden");
 
+            // Exibe o spinner principal
+            document.getElementById('mural-loading').style.display = 'flex';
+
+            // Carrega APIs
+            const liturgiaHTML = await carregarLiturgia();
+            liturgiaTab.innerHTML = liturgiaHTML;
+            await carregarSanto(santoTab);
+
+            // === 3️⃣ FESTIVIDADES E ANÚNCIOS (DO *NOSSO* FIRESTORE) ===
+            // Esta parte foi preservada e mesclada
             try {
-                // === 1️⃣ LITURGIA DO DIA (API EXTERNA - do seu ficheiro) ===
-                try {
-                    const res = await fetch("https://liturgia.up.railway.app/");
-                    if (!res.ok) throw new Error("Erro ao acessar API de liturgia");
-                    const data = await res.json();
-
-                    liturgiaTab.innerHTML = `
-                        <h4 class='font-semibold text-gray-700'>${data.dia}</h4>
-                        <div class='text-sm text-gray-600 mt-2 space-y-2'>
-                        <p><strong>1ª Leitura:</strong> ${data.liturgia.primeiraLeitura.titulo}</p>
-                        <p><strong>Salmo:</strong> ${data.liturgia.salmo.titulo}</p>
-                        <p><strong>Evangelho:</strong> ${data.liturgia.evangelho.titulo}</p>
-                        </div>
-                        <hr class='my-2'>
-                        <details class='text-sm text-gray-600'>
-                        <summary class='cursor-pointer text-yellow-700 font-medium'>Ver textos completos</summary>
-                        <div class='mt-2 space-y-2'>
-                            <p><strong>1ª Leitura:</strong><br>${data.liturgia.primeiraLeitura.texto}</p>
-                            <p><strong>Salmo:</strong><br>${data.liturgia.salmo.texto}</p>
-                            <p><strong>Evangelho:</strong><br>${data.liturgia.evangelho.texto}</p>
-                        </div>
-                        </details>
-                    `;
-                } catch (errLiturgia) {
-                    console.error('Erro ao buscar Liturgia:', errLiturgia);
-                    liturgiaTab.innerHTML = `<p class='text-sm text-red-600'>Não foi possível carregar a liturgia do dia.</p>`;
-                }
-
-                // === 2️⃣ SANTO DO DIA (API EXTERNA - do seu ficheiro) ===
-                try {
-                    const santoRes = await fetch("https://www.santoapi.com/api/v1/today");
-                    if (santoRes.ok) {
-                        const santoData = await santoRes.json();
-                        santoTab.innerHTML = `
-                            <img src='${santoData.image || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia'}' class='w-full h-32 object-cover rounded-lg mb-2'>
-                            <h4 class='font-semibold text-gray-700'>${santoData.name}</h4>
-                            <p class='text-sm text-gray-600'>${santoData.description ? santoData.description.substring(0, 150) + '...' : 'Sem descrição disponível.'}</p>
-                        `;
-                    } else {
-                        throw new Error('API de santo indisponível');
-                    }
-                } catch (errSanto) {
-                    console.warn('Erro ao buscar Santo do Dia:', errSanto);
-                    santoTab.innerHTML = `
-                        <img src='https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia' class='w-full h-32 object-cover rounded-lg mb-2'>
-                        <h4 class='font-semibold text-gray-700'>Santo do Dia</h4>
-                        <p class='text-sm text-gray-600'>Não foi possível carregar o Santo do Dia.</p>
-                    `;
-                }
-
-                // === 3️⃣ FESTIVIDADES E ANÚNCIOS (DO *NOSSO* FIRESTORE) ===
-                // Esta parte foi preservada do nosso código anterior.
                 const docRef = doc(db, "globalContent", "main");
                 onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
@@ -515,11 +530,15 @@
                     festasList.innerHTML = '<li>Erro ao carregar eventos.</li>';
                     anunciosList.innerHTML = '<li>Erro ao carregar anúncios.</li>';
                 });
-
-            } catch (err) {
-                console.error('Erro geral ao carregar mural:', err);
-                document.getElementById("mural-loading").innerText = "Erro ao carregar mural.";
+            } catch(err) {
+                console.error("Erro ao carregar dados do Firestore no Mural:", err);
+                festasList.innerHTML = '<li>Erro ao carregar eventos.</li>';
+                anunciosList.innerHTML = '<li>Erro ao carregar anúncios.</li>';
             }
+            
+            // Esconde o spinner principal e mostra o conteúdo
+            document.getElementById('mural-loading').style.display = 'none';
+            document.getElementById('mural-content').classList.remove('hidden');
         }
         
         // Função para carregar todas as paróquias
@@ -1181,7 +1200,7 @@
         // Função Genérica de Upload para o Cloudinary
         async function uploadImageToCloudinary(file) {
             // CORREÇÃO FINAL: Garantir que AMBAS as funções usam o nome correto
-            const CLOUDINARY_CLOUD_NAME = "dmmij5gpl"; // CORRIGIDO: Sem o 'i' extra
+            const CLOUDINARY_CLOUD_NAME = "dmmij5gpl";
             const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
             if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
