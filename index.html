@@ -116,7 +116,9 @@
                 <div id="mural-content" class="bg-white shadow-lg rounded-lg overflow-hidden hidden h-96">
                     <div class="p-6 h-full flex flex-col">
                         <h2 class="text-2xl font-bold text-yellow-700 mb-1">Mural Diocesano</h2>
-                                           
+                        <!-- <p class="text-sm text-gray-600 mb-2 flex items-center gap-1">✝️ <span><strong>Paz e bem!</strong> Confira abaixo a liturgia e o santo do dia.</span></p> -->
+                        <!-- <p id="mural-date" class="text-sm text-gray-500 mb-4 flex items-center gap-1"><span>📅</span><span id="mural-date-text"></span></p> -->
+                        
                         <!-- Abas do Mural -->
                         <div class="border-b border-gray-200 mt-2"> <!-- Adicionado mt-2 para compensar o espaço removido -->
                             <nav class="-mb-px flex space-x-4" aria-label="Tabs">
@@ -424,60 +426,51 @@
         // --- MODIFICAÇÃO: Funções do Mural (do seu ficheiro) ---
         async function carregarLiturgia() {
             try {
-                const res = await fetch('https://liturgia.up.railway.app/');
+                const res = await fetch('https://liturgia.up.railway.app/v2/');
                 if (!res.ok) throw new Error('Erro na API principal');
                 const data = await res.json();
                 return `
-                <h4 class='font-semibold text-gray-700'>${data.dia}</h4>
-                <div class='text-sm text-gray-600 mt-2 space-y-2'>
-                <p><strong>1ª Leitura:</strong> ${data.liturgia.primeiraLeitura.titulo}</p>
-                <p><strong>Salmo:</strong> ${data.liturgia.salmo.titulo}</p>
-                <p><strong>Evangelho:</strong> ${data.liturgia.evangelho.titulo}</p>
-                </div>
-<hr class='my-2'>
-<details class='text-sm text-gray-600'>
-<summary class='cursor-pointer text-yellow-700 font-medium'>Ver textos completos</summary>
-<div class='mt-2 space-y-2'>
-<p><strong>1ª Leitura:</strong><br>${data.liturgia.primeiraLeitura.texto}</p>
-<p><strong>Salmo:</strong><br>${data.liturgia.salmo.texto}</p>
-<p><strong>Evangelho:</strong><br>${data.liturgia.evangelho.texto}</p>
-</div>
-</details>
-`;
-} catch (error) {
-console.warn('Erro ao buscar liturgia, usando fallback:', error);
-return `<p class='text-sm text-gray-600'>Não foi possível carregar a liturgia de hoje. Tente novamente mais tarde.</p>`;
-}
-}
+                    <h4 class='font-semibold text-gray-700'>${data.dia}</h4>
+                    <div class='text-sm text-gray-600 mt-2 space-y-2'>
+                    <p><strong>1ª Leitura:</strong> ${data.liturgia.primeiraLeitura.titulo}</p>
+                    <p><strong>Salmo:</strong> ${data.liturgia.salmo.titulo}</p>
+                    <p><strong>Evangelho:</strong> ${data.liturgia.evangelho.titulo}</p>
+                    </div>
+                    <hr class='my-2'>
+                    <details class='text-sm text-gray-600'>
+                    <summary class='cursor-pointer text-yellow-700 font-medium'>Ver textos completos</summary>
+                    <div class='mt-2 space-y-2'>
+                        <p><strong>1ª Leitura:</strong><br>${data.liturgia.primeiraLeitura.texto}</p>
+                        <p><strong>Salmo:</strong><br>${data.liturgia.salmo.texto}</p>
+                        <p><strong>Evangelho:</strong><br>${data.liturgia.evangelho.texto}</p>
+                    </div>
+                    </details>
+                `;
+            } catch (error) {
+                console.warn('Erro ao buscar liturgia, usando fallback:', error);
+                return `<p class='text-sm text-gray-600'>Não foi possível carregar a liturgia de hoje. Tente novamente mais tarde.</p>`;
+            }
+        }
+
         async function carregarSanto(santoTab) {
-try {
-const santoRes = await fetch('https://www.santoapi.com/api/v1/today');
-if (!santoRes.ok) throw new Error('Erro na API de santo');
-const santoData = await santoRes.json();
-santoTab.innerHTML = `
-<img src='${santoData.image || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia'}' class='w-full h-32 object-cover rounded-lg mb-2'>
-<h4 class='font-semibold text-gray-700'>${santoData.name}</h4>
-<p class='text-sm text-gray-600'>${santoData.description || 'Sem descrição disponível.'}</p>
-`;
-} catch (errSanto) {
-console.warn('Erro ao buscar Santo do Dia:', errSanto);
-santoTab.innerHTML = `
-<img src='https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia' class='w-full h-32 object-cover rounded-lg mb-2'>
-<h4 class='font-semibold text-gray-700'>Santo do Dia</h4>
-<p class='text-sm text-gray-600'>Não foi possível carregar o Santo do Dia. Verifique sua conexão.</p>
-`;
-}
-}
-async function loadMural() {
-const liturgiaTab = document.getElementById('tab-liturgia');
-const santoTab = document.getElementById('tab-santo');
-const festasList = document.getElementById('festividades-list');
-const anunciosList = document.getElementById('anuncios-list');
-
-document.getElementById('mural-date-text').textContent = formatarDataAtual();
-
-// Exibe o spinner principal
-</script>
+            try {
+                const santoRes = await fetch('https://www.santoapi.com/api/v1/today');
+                if (!santoRes.ok) throw new Error('Erro na API de santo');
+                const santoData = await santoRes.json();
+                santoTab.innerHTML = `
+                    <img src='${santoData.image || 'https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia'}' class='w-full h-32 object-cover rounded-lg mb-2'>
+                    <h4 class='font-semibold text-gray-700'>${santoData.name}</h4>
+                    <p class='text-sm text-gray-600'>${santoData.description ? santoData.description.substring(0, 150) + '...' : 'Sem descrição disponível.'}</p>
+                `;
+            } catch (errSanto) {
+                console.warn('Erro ao buscar Santo do Dia:', errSanto);
+                santoTab.innerHTML = `
+                    <img src='https://placehold.co/300x200/c2b280/FFFFFF?text=Santo+do+Dia' class='w-full h-32 object-cover rounded-lg mb-2'>
+                    <h4 class='font-semibold text-gray-700'>Santo do Dia</h4>
+                    <p class='text-sm text-gray-600'>Não foi possível carregar o Santo do Dia. Verifique sua conexão.</p>
+                `;
+            }
+        }
 
         // --- MODIFICAÇÃO: 'loadMural' AGORA É HÍBRIDO (APIs + FIRESTORE) ---
         async function loadMural() {
@@ -1209,7 +1202,7 @@ document.getElementById('mural-date-text').textContent = formatarDataAtual();
         // Função Genérica de Upload para o Cloudinary
         async function uploadImageToCloudinary(file) {
             // CORREÇÃO FINAL: Garantir que AMBAS as funções usam o nome correto
-            const CLOUDINARY_CLOUD_NAME = "dmmij5gpl";
+            const CLOUDINARY_CLOUD_NAME = "dmmij5gpl"; // CORRIGIDO: Sem o 'i' extra
             const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 
             if (CLOUDINARY_CLOUD_NAME === "COLE_SEU_CLOUD_NAME_AQUI") {
@@ -1552,5 +1545,3 @@ document.getElementById('mural-date-text').textContent = formatarDataAtual();
     </script>
 </body>
 </html>
-
-
