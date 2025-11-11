@@ -268,7 +268,6 @@
         let currentEditingAvisoId = null; // ID do aviso sendo editado
 
         // Variáveis do Carrossel
-        let carouselTrack, carouselDots;
         let slides = [];
         let currentSlide = 0;
         let carouselInterval = null; // Para o auto-play
@@ -369,10 +368,6 @@
                             dotsContainer.style.display = 'none'; // Esconde bolinhas se for só 1 slide
                         }
 
-                        // Seleciona os elementos criados
-                        carouselTrack = document.getElementById("carousel-track");
-                        carouselDots = document.getElementById("carousel-dots");
-                        
                         // Inicia o carrossel
                         updateSlidePosition();
                         document.getElementById("destaque-loading").style.display = 'none';
@@ -409,15 +404,17 @@
             goToSlide(newIndex);
         }
 
-        function updateSlidePosition() {
-            const track = document.getElementById("carousel-track"); // Busca o elemento
+       function updateSlidePosition() {
+            // Busca o elemento 'track' no momento da execução
+            const track = document.getElementById("carousel-track");
             if (track) {
                 track.style.transform = `translateX(-${currentSlide * 100}%)`;
             }
         }
 
         function updateDots() {
-            const dots = document.getElementById("carousel-dots"); // Busca o elemento
+            // Busca o elemento 'dots' no momento da execução
+            const dots = document.getElementById("carousel-dots");
             if (dots) {
                 Array.from(dots.children).forEach((dot, index) => {
                     dot.classList.toggle('active', index === currentSlide);
@@ -428,7 +425,7 @@
         // --- MODIFICAÇÃO: Funções do Mural (do seu ficheiro) ---
         async function carregarLiturgia() {
             try {
-                const res = await fetch('https://liturgia.up.railway.app/v2/');
+                const res = await fetch('https://liturgia-diaria.up.railway.app/v2/');
                 if (!res.ok) throw new Error('Erro na API principal');
                 const data = await res.json();
                 return `
@@ -1547,5 +1544,6 @@
     </script>
 </body>
 </html>
+
 
 
