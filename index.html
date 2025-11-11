@@ -410,14 +410,16 @@
         }
 
         function updateSlidePosition() {
-            if (carouselTrack) {
-                carouselTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
+            const track = document.getElementById("carousel-track"); // Busca o elemento
+            if (track) {
+                track.style.transform = `translateX(-${currentSlide * 100}%)`;
             }
         }
 
         function updateDots() {
-            if (carouselDots) {
-                Array.from(carouselDots.children).forEach((dot, index) => {
+            const dots = document.getElementById("carousel-dots"); // Busca o elemento
+            if (dots) {
+                Array.from(dots.children).forEach((dot, index) => {
                     dot.classList.toggle('active', index === currentSlide);
                 });
             }
@@ -426,7 +428,7 @@
         // --- MODIFICAÇÃO: Funções do Mural (do seu ficheiro) ---
         async function carregarLiturgia() {
             try {
-                const res = await fetch('https://liturgia.up.railway.app/v2/');
+                const res = await fetch('https://liturgia-diaria.up.railway.app/v2/');
                 if (!res.ok) throw new Error('Erro na API principal');
                 const data = await res.json();
                 return `
@@ -1545,3 +1547,4 @@
     </script>
 </body>
 </html>
+
